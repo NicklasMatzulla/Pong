@@ -84,6 +84,11 @@ public class GameState extends BaseAppState implements ActionListener {
 
     private FilterPostProcessor postProcessor;
 
+    private final Vector3f networkPlayerTarget = new Vector3f();
+    private final Vector3f networkEnemyTarget = new Vector3f();
+    private final Vector3f networkBallTarget = new Vector3f();
+    private String lastClientStatus = "";
+
     public GameState(SimpleApplication app, Runnable onPause) {
         this(app, onPause, null);
     }
@@ -226,6 +231,7 @@ public class GameState extends BaseAppState implements ActionListener {
         var font = app.getAssetManager().loadFont("Interface/Fonts/Default.fnt");
         hud = new BitmapText(font, false);
         hud.setSize(32);
+        hud.setColor(new ColorRGBA(0.86f, 0.95f, 1f, 1f));
         app.getGuiNode().attachChild(hud);
         updateHud();
 
@@ -294,12 +300,16 @@ public class GameState extends BaseAppState implements ActionListener {
     public void update(float tpf) {
         updateCameraShake(tpf);
         if (multiplayer) {
+            pollNetworkStatus();
             if (!applyNetworkState()) {
                 updateNetworkStatus(tpf);
                 updateHud();
                 return;
             }
+            smoothNetworkSpatials(tpf);
             updateNetworkStatus(tpf);
+            updateHud();
+            return;
         }
         // Player movement X
         float dxPlayer = (movePlayerRight ? 1 : 0) - (movePlayerLeft ? 1 : 0);
@@ -392,7 +402,7 @@ public class GameState extends BaseAppState implements ActionListener {
 
     private void updateHud() {
         if (hud == null) return;
-        String txt = scorePlayer + " : " + scoreEnemy;
+        String txt = String.format("%02d  |  %02d", scorePlayer, scoreEnemy);
         if (!txt.equals(hud.getText())) hud.setText(txt);
         float x = (app.getCamera().getWidth()/2f) - (hud.getLineWidth()/2f);
         float y = app.getCamera().getHeight() - 20f;
@@ -549,22 +559,31 @@ public class GameState extends BaseAppState implements ActionListener {
             }
             return false;
         }
-        if (!networkReady) {
-            networkReady = true;
-            setNetworkStatus("", false);
-        }
-
         networkRole = networkClient.getRole();
 
         float myX = networkRole == NetworkClient.Role.FRONT ? state.frontX() : state.backX();
         float oppX = networkRole == NetworkClient.Role.FRONT ? state.backX() : state.frontX();
         float ballZServer = state.ballZ();
         float localBallZ = networkRole == NetworkClient.Role.FRONT ? ballZServer : -ballZServer;
+        boolean firstSnapshot = !networkReady;
+        if (!networkReady) {
+            networkReady = true;
+            lastClientStatus = networkClient.getServerStatus();
+            setNetworkStatus("", false);
+        }
 
-        playerPaddle.setLocalTranslation(myX, playerPaddle.getLocalTranslation().y, playerPaddle.getLocalTranslation().z);
-        enemyPaddle.setLocalTranslation(oppX, enemyPaddle.getLocalTranslation().y, enemyPaddle.getLocalTranslation().z);
-        ball.setLocalTranslation(state.ballX(), ballRadius, localBallZ);
+        networkPlayerTarget.set(myX, playerPaddle.getLocalTranslation().y, playerPaddle.getLocalTranslation().z);
+        networkEnemyTarget.set(oppX, enemyPaddle.getLocalTranslation().y, enemyPaddle.getLocalTranslation().z);
+        networkBallTarget.set(state.ballX(), ballRadius, localBallZ);
 
+        if (firstSnapshot) {
+            playerPaddle.setLocalTranslation(networkPlayerTarget);
+            enemyPaddle.setLocalTranslation(networkEnemyTarget);
+            ball.setLocalTranslation(networkBallTarget);
+        }
+
+        int prevPlayer = scorePlayer;
+        int prevEnemy = scoreEnemy;
         if (networkRole == NetworkClient.Role.FRONT) {
             scorePlayer = state.scoreFront();
             scoreEnemy = state.scoreBack();
@@ -573,11 +592,63 @@ public class GameState extends BaseAppState implements ActionListener {
             scoreEnemy = state.scoreFront();
         }
 
+        if (scorePlayer > prevPlayer) {
+            spawnGoalEffect(true);
+            triggerCameraShake(0.45f, 0.45f);
+        } else if (scoreEnemy > prevEnemy) {
+            spawnGoalEffect(false);
+            triggerCameraShake(0.45f, 0.45f);
+        }
+
         if (!networkClient.isRunning()) {
             setNetworkStatus("Gegner getrennt", true);
         }
-
         return true;
+    }
+
+    private void smoothNetworkSpatials(float tpf) {
+        float smoothing = FastMath.clamp(tpf * 14f, 0f, 1f);
+        interpolateSpatial(playerPaddle, networkPlayerTarget, smoothing);
+        interpolateSpatial(enemyPaddle, networkEnemyTarget, smoothing);
+        interpolateSpatial(ball, networkBallTarget, FastMath.clamp(tpf * 18f, 0f, 1f));
+    }
+
+    private void interpolateSpatial(Geometry geom, Vector3f target, float alpha) {
+        if (geom == null) {
+            return;
+        }
+        if (alpha >= 1f) {
+            geom.setLocalTranslation(target);
+            return;
+        }
+        Vector3f current = geom.getLocalTranslation();
+        current.interpolateLocal(target, alpha);
+        geom.setLocalTranslation(current);
+    }
+
+    private void pollNetworkStatus() {
+        if (networkClient == null || networkStatusText == null) {
+            return;
+        }
+        String status = networkClient.getServerStatus();
+        if (status == null) {
+            return;
+        }
+        if (networkReady && status.startsWith("Match gefunden")) {
+            lastClientStatus = status;
+            if (!currentNetworkMessage.isEmpty()) {
+                setNetworkStatus("", false);
+            }
+            return;
+        }
+        if (!status.equals(lastClientStatus)) {
+            lastClientStatus = status;
+            if (status.isBlank()) {
+                setNetworkStatus("", false);
+            } else {
+                setNetworkStatus(status, true);
+            }
+        }
     }
 
     /** Simple follower that leaves a fading trail by sampling owner's transform with delay. */

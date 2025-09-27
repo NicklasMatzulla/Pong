@@ -169,6 +169,7 @@ public final class MasterServer implements AutoCloseable {
             System.out.println("[MasterServer] Starting match: " + front.name + " vs " + back.name);
             front.send("START FRONT");
             back.send("START BACK");
+            broadcastState(System.nanoTime());
             long last = System.nanoTime();
             while (running) {
                 long now = System.nanoTime();
@@ -230,7 +231,9 @@ public final class MasterServer implements AutoCloseable {
         }
 
         private void broadcastState(long timestamp) {
-            String msg = String.format("STATE %d %.4f %.4f %.4f %.4f %d %d", timestamp, frontX, backX, ballX, ballZ, scoreFront, scoreBack);
+            String msg = String.format(java.util.Locale.US,
+                    "STATE %d %.4f %.4f %.4f %.4f %d %d",
+                    timestamp, frontX, backX, ballX, ballZ, scoreFront, scoreBack);
             if (!front.send(msg)) {
                 stopWithReason(front, back, "front-disconnected");
             }

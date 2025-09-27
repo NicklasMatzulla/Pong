@@ -24,6 +24,7 @@ public final class NetworkClient implements AutoCloseable {
     private final AtomicReference<WorldState> worldState = new AtomicReference<>();
     private volatile Role role = Role.FRONT;
     private volatile boolean running = true;
+    private final AtomicReference<String> serverStatus = new AtomicReference<>("Verbinde...");
 
     public NetworkClient(String host, int port, String name) throws IOException {
         this.socket = new Socket(host, port);
@@ -66,6 +67,9 @@ public final class NetworkClient implements AutoCloseable {
                 } catch (NumberFormatException ignored) {
                 }
             }
+            serverStatus.compareAndSet("Suche nach Mitspielern...", "Match gefunden");
+        } else if (line.startsWith("WAITING")) {
+            serverStatus.set("Suche nach Mitspielern...");
         } else if (line.startsWith("START")) {
             String[] parts = line.split(" ");
             if (parts.length >= 2) {
@@ -75,8 +79,19 @@ public final class NetworkClient implements AutoCloseable {
                     role = Role.BACK;
                 }
             }
+            if (role == Role.FRONT) {
+                serverStatus.set("Match gefunden • Du spielst vorne");
+            } else {
+                serverStatus.set("Match gefunden • Du spielst hinten");
+            }
         } else if (line.startsWith("END")) {
             running = false;
+            String reason = line.length() > 4 ? line.substring(4).trim() : "";
+            if (reason.isEmpty()) {
+                serverStatus.set("Match beendet");
+            } else {
+                serverStatus.set("Verbindung beendet: " + reason);
+            }
         }
     }
 
@@ -95,6 +110,10 @@ public final class NetworkClient implements AutoCloseable {
     public void sendDirection(int direction) {
         int dir = Math.max(-1, Math.min(1, direction));
         writer.println("MOVE " + dir);
+    }
+
+    public String getServerStatus() {
+        return serverStatus.get();
     }
 
     @Override
