@@ -99,8 +99,11 @@ public class GameState extends BaseAppState implements ActionListener {
     private float cameraShakeElapsed = 0f;
     private float cameraShakeStrength = 0f;
     private Vector3f cameraBasePos = new Vector3f();
+    private final Vector3f cameraTargetPos = new Vector3f();
+    private final Vector3f cameraFocusPos = new Vector3f();
     private final Vector3f tempCameraPos = new Vector3f();
     private final Vector3f cameraShakeOffset = new Vector3f();
+    private final Vector3f cameraLookTarget = new Vector3f();
     private final ColorRGBA networkStatusBaseColor = new ColorRGBA(0.8f, 0.9f, 1f, 0.85f);
 
     private final Random random = new Random();
@@ -125,16 +128,19 @@ public class GameState extends BaseAppState implements ActionListener {
 
     @Override
     protected void initialize(Application ignored) {
-        // Kamera statisch über dem Spielfeld fixieren
+        // Kamera fixieren (kein Maus-FlyCam)
         app.getFlyByCamera().setEnabled(false);
         app.getFlyByCamera().setMoveSpeed(0f);
         app.getFlyByCamera().setDragToRotate(false);
         app.getInputManager().setCursorVisible(false);
 
-        // Kamera-Startposition
-        cameraBasePos = new Vector3f(0f, 22f, 0f);
+        // Kamera-Startposition hinter der Spielerwand
+        float initialDistance = 9.5f;
+        float initialHeight = 4.5f;
+        cameraBasePos = new Vector3f(0f, initialHeight, halfDepth - 0.6f + initialDistance);
+        cameraFocusPos.set(0f, 1.6f, 0f);
         app.getCamera().setLocation(cameraBasePos.clone());
-        app.getCamera().lookAt(Vector3f.ZERO, Vector3f.UNIT_Z);
+        app.getCamera().lookAt(cameraFocusPos, Vector3f.UNIT_Y);
 
         // Licht
         AmbientLight amb = new AmbientLight();
@@ -355,6 +361,7 @@ public class GameState extends BaseAppState implements ActionListener {
     @Override
     public void update(float tpf) {
         updateBackground(tpf);
+        updateCameraFollow(tpf);
         updateCameraShake(tpf);
         if (multiplayer) {
             pollNetworkStatus();
@@ -455,6 +462,28 @@ public class GameState extends BaseAppState implements ActionListener {
         }
 
         updateHud();
+    }
+
+    private void updateCameraFollow(float tpf) {
+        if (playerPaddle == null) {
+            return;
+        }
+        float blend = FastMath.clamp(tpf * 5.5f, 0f, 1f);
+        Vector3f paddlePos = playerPaddle.getLocalTranslation();
+        float facing = paddlePos.z >= 0f ? 1f : -1f;
+        float followDistance = 9.5f;
+        float followHeight = 4.5f;
+
+        cameraTargetPos.set(paddlePos.x, followHeight, paddlePos.z + facing * followDistance);
+        cameraBasePos.interpolateLocal(cameraTargetPos, blend);
+
+        cameraLookTarget.set(paddlePos.x * 0.4f, 1.6f, paddlePos.z - facing * 6f);
+        cameraFocusPos.interpolateLocal(cameraLookTarget, blend);
+
+        if (cameraShakeDuration <= 0f) {
+            app.getCamera().setLocation(cameraBasePos);
+        }
+        app.getCamera().lookAt(cameraFocusPos, Vector3f.UNIT_Y);
     }
 
     private void updateHud() {
@@ -607,7 +636,7 @@ public class GameState extends BaseAppState implements ActionListener {
             cameraShakeElapsed = 0f;
             cameraShakeStrength = 0f;
             app.getCamera().setLocation(cameraBasePos.clone());
-            app.getCamera().lookAt(Vector3f.ZERO, Vector3f.UNIT_Z);
+            app.getCamera().lookAt(cameraFocusPos, Vector3f.UNIT_Y);
             return null;
         });
         var im = app.getInputManager();
