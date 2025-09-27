@@ -11,6 +11,7 @@ import com.jme3.input.controls.KeyTrigger;
 import com.jme3.light.AmbientLight;
 import com.jme3.light.DirectionalLight;
 import com.jme3.material.Material;
+import com.jme3.material.RenderState;
 import com.jme3.math.ColorRGBA;
 import com.jme3.math.FastMath;
 import com.jme3.math.Quaternion;
@@ -24,7 +25,9 @@ import com.jme3.scene.Node;
 import com.jme3.scene.Spatial;
 import com.jme3.scene.control.AbstractControl;
 import com.jme3.scene.shape.Box;
+import com.jme3.scene.shape.Quad;
 import com.jme3.scene.shape.Sphere;
+import com.jme3.scene.shape.Torus;
 import com.jme3.effect.ParticleEmitter;
 import com.jme3.effect.ParticleMesh;
 
@@ -46,12 +49,32 @@ public class GameState extends BaseAppState implements ActionListener {
 
     private final Node root = new Node("game");
     private Geometry playerPaddle, enemyPaddle, ball, table;
+    private final Node environment = new Node("environment");
+    private Spatial skyDome;
+    private Geometry auroraRing;
+    private Geometry auroraRibbon;
+    private ParticleEmitter starfield;
+    private Material skyMaterial;
+    private Material auroraMaterial;
+    private Material ribbonMaterial;
+    private Material tableMaterial;
+    private float backgroundTime = 0f;
+    private final ColorRGBA[] backgroundPalette = new ColorRGBA[] {
+            new ColorRGBA(0.04f, 0.06f, 0.18f, 1f),
+            new ColorRGBA(0.07f, 0.09f, 0.28f, 1f),
+            new ColorRGBA(0.1f, 0.05f, 0.22f, 1f),
+            new ColorRGBA(0.02f, 0.11f, 0.24f, 1f)
+    };
+    private final ColorRGBA blendedBackground = new ColorRGBA();
+    private final ColorRGBA auroraColor = new ColorRGBA();
+    private final ColorRGBA ribbonColor = new ColorRGBA();
     private final Vector3f ballVel = new Vector3f(5f, 0f, -6f);
     private final float paddleSpeed = 12f;
 
     private boolean movePlayerLeft, movePlayerRight, moveEnemyLeft, moveEnemyRight;
     private int scorePlayer = 0, scoreEnemy = 0;
     private BitmapText hud;
+    private final ColorRGBA hudColor = new ColorRGBA(0.86f, 0.95f, 1f, 1f);
     private BitmapText networkStatusText;
     private float networkStatusPulse = 0f;
     private String currentNetworkMessage = "";
@@ -122,24 +145,59 @@ public class GameState extends BaseAppState implements ActionListener {
         root.addLight(amb);
         root.addLight(sun);
 
-        // Sternen-"Sky": Partikel-Emitter im Hintergrund
-        ParticleEmitter stars = new ParticleEmitter("stars", ParticleMesh.Type.Triangle, 1500);
-        stars.setGravity(0,0,0);
-        stars.setLowLife(4f);
-        stars.setHighLife(8f);
-        stars.getParticleInfluencer().setInitialVelocity(new Vector3f(0,0,-2f));
-        stars.getParticleInfluencer().setVelocityVariation(1f);
-        stars.setStartSize(0.03f);
-        stars.setEndSize(0.03f);
-        stars.setStartColor(ColorRGBA.White);
-        stars.setEndColor(new ColorRGBA(1,1,1,0.2f));
-        stars.setImagesX(1); stars.setImagesY(1);
+        // Umgebung: Himmelskugel, Aurora und Partikel-Hintergrund
+        root.attachChild(environment);
+
+        skyMaterial = new Material(app.getAssetManager(), "Common/MatDefs/Misc/Unshaded.j3md");
+        skyMaterial.setColor("Color", backgroundPalette[0]);
+        Sphere dome = new Sphere(24, 24, 80f);
+        dome.setTextureMode(Sphere.TextureMode.Polar);
+        skyDome = new Geometry("sky-dome", dome);
+        skyDome.setMaterial(skyMaterial);
+        skyDome.setQueueBucket(RenderQueue.Bucket.Sky);
+        skyDome.setCullHint(Spatial.CullHint.Never);
+        skyDome.setLocalScale(-1f);
+        environment.attachChild(skyDome);
+
+        starfield = new ParticleEmitter("stars", ParticleMesh.Type.Triangle, 1500);
+        starfield.setGravity(0,0,0);
+        starfield.setLowLife(4f);
+        starfield.setHighLife(8f);
+        starfield.getParticleInfluencer().setInitialVelocity(new Vector3f(0,0,-2f));
+        starfield.getParticleInfluencer().setVelocityVariation(1f);
+        starfield.setStartSize(0.03f);
+        starfield.setEndSize(0.03f);
+        starfield.setStartColor(new ColorRGBA(1f, 1f, 1f, 0.35f));
+        starfield.setEndColor(new ColorRGBA(1f,1f,1f,0.05f));
+        starfield.setImagesX(1);
+        starfield.setImagesY(1);
         Material starMat = new Material(app.getAssetManager(), "Common/MatDefs/Misc/Unshaded.j3md");
         starMat.setColor("Color", ColorRGBA.White);
-        stars.setMaterial(starMat);
-        stars.setQueueBucket(RenderQueue.Bucket.Sky);
-        stars.setLocalTranslation(0, 5f, 0);
-        root.attachChild(stars);
+        starfield.setMaterial(starMat);
+        starfield.setQueueBucket(RenderQueue.Bucket.Sky);
+        starfield.setLocalTranslation(0, 6f, 0);
+        environment.attachChild(starfield);
+
+        auroraMaterial = new Material(app.getAssetManager(), "Common/MatDefs/Misc/Unshaded.j3md");
+        auroraMaterial.setColor("Color", new ColorRGBA(0.18f, 0.52f, 0.9f, 0.4f));
+        auroraMaterial.getAdditionalRenderState().setBlendMode(RenderState.BlendMode.Additive);
+        Torus ringMesh = new Torus(64, 16, 0.4f, halfWidth + 5f);
+        auroraRing = new Geometry("aurora-ring", ringMesh);
+        auroraRing.setQueueBucket(RenderQueue.Bucket.Transparent);
+        auroraRing.setMaterial(auroraMaterial);
+        auroraRing.rotate(FastMath.HALF_PI, 0f, 0f);
+        auroraRing.setLocalTranslation(0, 0.6f, 0);
+        environment.attachChild(auroraRing);
+
+        ribbonMaterial = auroraMaterial.clone();
+        ribbonMaterial.getAdditionalRenderState().setBlendMode(RenderState.BlendMode.Alpha);
+        Quad ribbonMesh = new Quad((halfWidth + 6f) * 2f, (halfDepth + 8f) * 2f);
+        auroraRibbon = new Geometry("aurora-ribbon", ribbonMesh);
+        auroraRibbon.setQueueBucket(RenderQueue.Bucket.Transparent);
+        auroraRibbon.setMaterial(ribbonMaterial);
+        auroraRibbon.setLocalTranslation(-(ribbonMesh.getWidth() / 2f), 0.2f, -(ribbonMesh.getHeight() / 2f));
+        auroraRibbon.rotate(-FastMath.HALF_PI, 0f, 0f);
+        environment.attachChild(auroraRibbon);
 
         // Materialien (Lighting + Glow)
         Material matBlue = new Material(app.getAssetManager(), "Common/MatDefs/Light/Lighting.j3md");
@@ -170,8 +228,9 @@ public class GameState extends BaseAppState implements ActionListener {
         matBall.setFloat("Shininess", 64f);
 
         // Tisch
+        tableMaterial = matTable;
         table = new Geometry("table", new Box(halfWidth+0.2f, 0.1f, halfDepth+0.2f));
-        table.setMaterial(matTable);
+        table.setMaterial(tableMaterial);
         table.setShadowMode(RenderQueue.ShadowMode.Receive);
         root.attachChild(table);
 
@@ -228,7 +287,7 @@ public class GameState extends BaseAppState implements ActionListener {
         var font = app.getAssetManager().loadFont("Interface/Fonts/Default.fnt");
         hud = new BitmapText(font, false);
         hud.setSize(32);
-        hud.setColor(new ColorRGBA(0.86f, 0.95f, 1f, 1f));
+        hud.setColor(hudColor);
         app.getGuiNode().attachChild(hud);
         updateHud();
 
@@ -295,6 +354,7 @@ public class GameState extends BaseAppState implements ActionListener {
 
     @Override
     public void update(float tpf) {
+        updateBackground(tpf);
         updateCameraShake(tpf);
         if (multiplayer) {
             pollNetworkStatus();
@@ -404,6 +464,73 @@ public class GameState extends BaseAppState implements ActionListener {
         float x = (app.getCamera().getWidth()/2f) - (hud.getLineWidth()/2f);
         float y = app.getCamera().getHeight() - 20f;
         hud.setLocalTranslation(x, y, 0);
+        hud.setColor(hudColor);
+    }
+
+    private void updateBackground(float tpf) {
+        if (skyMaterial == null) {
+            return;
+        }
+        backgroundTime += tpf;
+        float cycleDuration = 18f;
+        float cyclePosition = (backgroundTime % cycleDuration) / cycleDuration;
+        int currentIndex = (int) ((backgroundTime / cycleDuration) % backgroundPalette.length);
+        int nextIndex = (currentIndex + 1) % backgroundPalette.length;
+        blendedBackground.set(backgroundPalette[currentIndex]);
+        blendedBackground.interpolateLocal(backgroundPalette[nextIndex], cyclePosition);
+
+        skyMaterial.setColor("Color", blendedBackground);
+
+        if (starfield != null) {
+            ColorRGBA start = blendedBackground.clone();
+            start.a = 0.45f;
+            starfield.setStartColor(start);
+            ColorRGBA end = blendedBackground.clone();
+            end.a = 0.08f;
+            starfield.setEndColor(end);
+        }
+
+        float auroraPulse = 0.6f + FastMath.sin(backgroundTime * 0.9f) * 0.25f;
+        auroraColor.set(blendedBackground);
+        auroraColor.r = FastMath.clamp(auroraColor.r + 0.25f, 0f, 1f);
+        auroraColor.g = FastMath.clamp(auroraColor.g + 0.35f, 0f, 1f);
+        auroraColor.b = FastMath.clamp(auroraColor.b + 0.55f, 0f, 1f);
+        auroraColor.a = auroraPulse;
+
+        if (auroraMaterial != null) {
+            auroraMaterial.setColor("Color", auroraColor);
+        }
+        if (auroraRing != null) {
+            auroraRing.rotate(0f, tpf * 0.35f, 0f);
+        }
+
+        if (ribbonMaterial != null) {
+            ribbonColor.set(auroraColor);
+            ribbonColor.a = 0.25f + FastMath.sin(backgroundTime * 0.7f) * 0.15f;
+            ribbonMaterial.setColor("Color", ribbonColor);
+        }
+        if (auroraRibbon != null) {
+            auroraRibbon.rotate(0f, tpf * 0.1f, 0f);
+        }
+
+        if (tableMaterial != null) {
+            ColorRGBA tableDiffuse = new ColorRGBA(
+                    FastMath.clamp(blendedBackground.r * 0.4f + 0.08f, 0f, 1f),
+                    FastMath.clamp(blendedBackground.g * 0.3f + 0.07f, 0f, 1f),
+                    FastMath.clamp(blendedBackground.b * 0.5f + 0.1f, 0f, 1f),
+                    1f);
+            tableMaterial.setColor("Diffuse", tableDiffuse);
+        }
+
+        hudColor.set(
+                FastMath.clamp(0.6f + blendedBackground.r * 0.35f, 0f, 1f),
+                FastMath.clamp(0.75f + blendedBackground.g * 0.2f, 0f, 1f),
+                FastMath.clamp(0.85f + blendedBackground.b * 0.25f, 0f, 1f),
+                1f);
+
+        networkStatusBaseColor.r = FastMath.clamp(0.6f + blendedBackground.r * 0.25f, 0f, 1f);
+        networkStatusBaseColor.g = FastMath.clamp(0.75f + blendedBackground.g * 0.2f, 0f, 1f);
+        networkStatusBaseColor.b = FastMath.clamp(0.95f + blendedBackground.b * 0.15f, 0f, 1f);
     }
 
     private void setNetworkStatus(String text, boolean visible) {
