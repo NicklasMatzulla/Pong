@@ -52,6 +52,10 @@ public class GameState extends BaseAppState implements ActionListener {
     private boolean movePlayerLeft, movePlayerRight, moveEnemyLeft, moveEnemyRight;
     private int scorePlayer = 0, scoreEnemy = 0;
     private BitmapText hud;
+    private BitmapText networkStatusText;
+    private float networkStatusPulse = 0f;
+    private String currentNetworkMessage = "";
+    private boolean networkReady = false;
 
     private final float halfWidth = 8f;
     private final float halfDepth = 4.5f;
@@ -72,7 +76,9 @@ public class GameState extends BaseAppState implements ActionListener {
     private float cameraShakeElapsed = 0f;
     private float cameraShakeStrength = 0f;
     private Vector3f cameraBasePos = new Vector3f();
+    private final Vector3f tempCameraPos = new Vector3f();
     private final Vector3f cameraShakeOffset = new Vector3f();
+    private final ColorRGBA networkStatusBaseColor = new ColorRGBA(0.8f, 0.9f, 1f, 0.85f);
 
     private final Random random = new Random();
 
@@ -193,12 +199,10 @@ public class GameState extends BaseAppState implements ActionListener {
         playerPaddle = new Geometry("playerPaddle", new Box(1.8f, 0.4f, 0.2f));
         playerPaddle.setMaterial(matBlue);
         playerPaddle.setLocalTranslation(0, 0.5f, halfDepth - 0.6f);
-        playerPaddle.rotate(0, FastMath.DEG_TO_RAD * 8f, 0);
 
         enemyPaddle = new Geometry("enemyPaddle", new Box(1.8f, 0.4f, 0.2f));
         enemyPaddle.setMaterial(matRed);
         enemyPaddle.setLocalTranslation(0, 0.5f, -halfDepth + 0.6f);
-        enemyPaddle.rotate(0, -FastMath.DEG_TO_RAD * 8f, 0);
 
         // Ball
         Sphere sph = new Sphere(24, 24, ballRadius);
@@ -224,6 +228,16 @@ public class GameState extends BaseAppState implements ActionListener {
         hud.setSize(32);
         app.getGuiNode().attachChild(hud);
         updateHud();
+
+        if (multiplayer) {
+            networkStatusText = new BitmapText(font, false);
+            networkStatusText.setSize(24);
+            networkStatusText.setText("");
+            networkStatusText.setColor(networkStatusBaseColor);
+            networkStatusText.setLocalTranslation(0, app.getCamera().getHeight() / 2f, 0);
+            app.getGuiNode().attachChild(networkStatusText);
+            setNetworkStatus("Verbinde mit Gegner...", true);
+        }
 
         // Input
         var im = app.getInputManager();
@@ -280,9 +294,12 @@ public class GameState extends BaseAppState implements ActionListener {
     public void update(float tpf) {
         updateCameraShake(tpf);
         if (multiplayer) {
-            applyNetworkState();
-            updateHud();
-            return;
+            if (!applyNetworkState()) {
+                updateNetworkStatus(tpf);
+                updateHud();
+                return;
+            }
+            updateNetworkStatus(tpf);
         }
         // Player movement X
         float dxPlayer = (movePlayerRight ? 1 : 0) - (movePlayerLeft ? 1 : 0);
@@ -382,6 +399,36 @@ public class GameState extends BaseAppState implements ActionListener {
         hud.setLocalTranslation(x, y, 0);
     }
 
+    private void setNetworkStatus(String text, boolean visible) {
+        if (networkStatusText == null) {
+            return;
+        }
+        currentNetworkMessage = visible ? text : "";
+        networkStatusText.setText(currentNetworkMessage);
+        networkStatusText.setCullHint(visible ? Spatial.CullHint.Never : Spatial.CullHint.Always);
+        if (visible) {
+            networkStatusPulse = 0f;
+            networkStatusBaseColor.a = 0.85f;
+            networkStatusText.setColor(networkStatusBaseColor);
+            float x = (app.getCamera().getWidth() - networkStatusText.getLineWidth()) / 2f;
+            float y = (app.getCamera().getHeight() / 2f) + networkStatusText.getLineHeight();
+            networkStatusText.setLocalTranslation(x, y, 0);
+        }
+    }
+
+    private void updateNetworkStatus(float tpf) {
+        if (networkStatusText == null) {
+            return;
+        }
+        if (networkStatusText.getCullHint() == Spatial.CullHint.Always) {
+            return;
+        }
+        networkStatusPulse += tpf;
+        float pulse = 0.6f + FastMath.sin(networkStatusPulse * 3f) * 0.2f;
+        networkStatusBaseColor.a = pulse;
+        networkStatusText.setColor(networkStatusBaseColor);
+    }
+
     private void clampPaddleX(Geometry p) {
         float x = p.getLocalTranslation().x;
         x = FastMath.clamp(x, -halfWidth + 1.8f, halfWidth - 1.8f);
@@ -439,6 +486,7 @@ public class GameState extends BaseAppState implements ActionListener {
         im.deleteMapping("PAUSE");
         im.deleteMapping("CAM_TOGGLE");
         if (hud != null) hud.removeFromParent();
+        if (networkStatusText != null) networkStatusText.removeFromParent();
         app.getInputManager().setCursorVisible(true);
         app.getFlyByCamera().setEnabled(false);
     }
@@ -488,10 +536,24 @@ public class GameState extends BaseAppState implements ActionListener {
         networkClient.sendDirection(dir);
     }
 
-    private void applyNetworkState() {
-        if (networkClient == null) return;
+    private boolean applyNetworkState() {
+        if (networkClient == null) {
+            return false;
+        }
         var state = networkClient.getWorldState();
-        if (state == null) return;
+        if (state == null) {
+            if (!networkClient.isRunning()) {
+                setNetworkStatus("Verbindung verloren", true);
+            } else {
+                setNetworkStatus("Warte auf Mitspieler...", true);
+            }
+            return false;
+        }
+        if (!networkReady) {
+            networkReady = true;
+            setNetworkStatus("", false);
+        }
+
         networkRole = networkClient.getRole();
 
         float myX = networkRole == NetworkClient.Role.FRONT ? state.frontX() : state.backX();
@@ -510,6 +572,12 @@ public class GameState extends BaseAppState implements ActionListener {
             scorePlayer = state.scoreBack();
             scoreEnemy = state.scoreFront();
         }
+
+        if (!networkClient.isRunning()) {
+            setNetworkStatus("Gegner getrennt", true);
+        }
+
+        return true;
     }
 
     /** Simple follower that leaves a fading trail by sampling owner's transform with delay. */
@@ -562,7 +630,8 @@ public class GameState extends BaseAppState implements ActionListener {
                 (random.nextFloat() * 2f - 1f) * cameraShakeStrength * 0.6f * falloff,
                 (random.nextFloat() * 2f - 1f) * cameraShakeStrength * 0.4f * falloff
         );
-        app.getCamera().setLocation(cameraBasePos.add(cameraShakeOffset));
+        tempCameraPos.set(cameraBasePos).addLocal(cameraShakeOffset);
+        app.getCamera().setLocation(tempCameraPos);
     }
 
     private void triggerCameraShake(float strength, float duration) {
