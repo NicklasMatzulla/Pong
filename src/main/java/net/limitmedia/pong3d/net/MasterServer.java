@@ -132,8 +132,8 @@ public final class MasterServer implements AutoCloseable {
     }
 
     private static final class GameSession implements Runnable {
-        private static final float HALF_WIDTH = 8f;
-        private static final float HALF_DEPTH = 4.5f;
+        private static final float HALF_WIDTH = 5.5f;
+        private static final float HALF_DEPTH = 9f;
         private static final float PADDLE_SPEED = 12f;
         private static final float BALL_RADIUS = 0.25f;
         private static final float MAX_BALL_SPEED = 22f;

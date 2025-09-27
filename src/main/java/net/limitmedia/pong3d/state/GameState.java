@@ -57,8 +57,8 @@ public class GameState extends BaseAppState implements ActionListener {
     private String currentNetworkMessage = "";
     private boolean networkReady = false;
 
-    private final float halfWidth = 8f;
-    private final float halfDepth = 4.5f;
+    private final float halfWidth = 5.5f;
+    private final float halfDepth = 9f;
 
     private final float ballRadius = 0.25f;
     private final ColorRGBA playerColor = new ColorRGBA(0.3f,0.8f,1f,1f);
@@ -102,19 +102,16 @@ public class GameState extends BaseAppState implements ActionListener {
 
     @Override
     protected void initialize(Application ignored) {
-        // Kamera + Maussteuerung
-        app.getFlyByCamera().setEnabled(true);
-        app.getFlyByCamera().setDragToRotate(false); // sofortige Maus-Capture
-        app.getFlyByCamera().setMoveSpeed(20f);
+        // Kamera statisch über dem Spielfeld fixieren
+        app.getFlyByCamera().setEnabled(false);
+        app.getFlyByCamera().setMoveSpeed(0f);
+        app.getFlyByCamera().setDragToRotate(false);
         app.getInputManager().setCursorVisible(false);
-        // Toggle per C
-        app.getInputManager().addMapping("CAM_TOGGLE", new KeyTrigger(KeyInput.KEY_C));
-        app.getInputManager().addListener(this, "CAM_TOGGLE");
 
         // Kamera-Startposition
-        cameraBasePos = new Vector3f(0, 12, 18);
+        cameraBasePos = new Vector3f(0f, 22f, 0f);
         app.getCamera().setLocation(cameraBasePos.clone());
-        app.getCamera().lookAt(Vector3f.ZERO, Vector3f.UNIT_Y);
+        app.getCamera().lookAt(Vector3f.ZERO, Vector3f.UNIT_Z);
 
         // Licht
         AmbientLight amb = new AmbientLight();
@@ -483,7 +480,7 @@ public class GameState extends BaseAppState implements ActionListener {
             cameraShakeElapsed = 0f;
             cameraShakeStrength = 0f;
             app.getCamera().setLocation(cameraBasePos.clone());
-            app.getCamera().lookAt(Vector3f.ZERO, Vector3f.UNIT_Y);
+            app.getCamera().lookAt(Vector3f.ZERO, Vector3f.UNIT_Z);
             return null;
         });
         var im = app.getInputManager();
@@ -494,7 +491,6 @@ public class GameState extends BaseAppState implements ActionListener {
             im.deleteMapping("EN_RIGHT");
         }
         im.deleteMapping("PAUSE");
-        im.deleteMapping("CAM_TOGGLE");
         if (hud != null) hud.removeFromParent();
         if (networkStatusText != null) networkStatusText.removeFromParent();
         app.getInputManager().setCursorVisible(true);
@@ -518,13 +514,6 @@ public class GameState extends BaseAppState implements ActionListener {
             case "PAUSE":
                 if (!isPressed && onPause != null) {
                     onPause.run();
-                }
-                break;
-            case "CAM_TOGGLE":
-                if (!isPressed) {
-                    boolean enabled = app.getFlyByCamera().isDragToRotate();
-                    app.getFlyByCamera().setDragToRotate(!enabled);
-                    app.getInputManager().setCursorVisible(enabled);
                 }
                 break;
         }
@@ -698,10 +687,14 @@ public class GameState extends BaseAppState implements ActionListener {
         float falloff = (1f - progress);
         cameraShakeOffset.set(
                 (random.nextFloat() * 2f - 1f) * cameraShakeStrength * falloff,
-                (random.nextFloat() * 2f - 1f) * cameraShakeStrength * 0.6f * falloff,
-                (random.nextFloat() * 2f - 1f) * cameraShakeStrength * 0.4f * falloff
+                0f,
+                (random.nextFloat() * 2f - 1f) * cameraShakeStrength * 0.55f * falloff
         );
-        tempCameraPos.set(cameraBasePos).addLocal(cameraShakeOffset);
+        tempCameraPos.set(
+                cameraBasePos.x + cameraShakeOffset.x,
+                cameraBasePos.y,
+                cameraBasePos.z + cameraShakeOffset.z
+        );
         app.getCamera().setLocation(tempCameraPos);
     }
 
