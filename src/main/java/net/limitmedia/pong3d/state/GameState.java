@@ -16,9 +16,15 @@ import com.jme3.math.ColorRGBA;
 import com.jme3.math.FastMath;
 import com.jme3.math.Quaternion;
 import com.jme3.math.Vector3f;
+import com.jme3.effect.ParticleEmitter;
+import com.jme3.effect.ParticleMesh;
+import com.jme3.effect.shapes.EmitterSphereShape;
 import com.jme3.post.FilterPostProcessor;
 import com.jme3.post.filters.BloomFilter;
+import com.jme3.post.filters.DepthOfFieldFilter;
 import com.jme3.post.filters.FXAAFilter;
+import com.jme3.post.filters.LightScatteringFilter;
+import com.jme3.post.ssao.SSAOFilter;
 import com.jme3.renderer.queue.RenderQueue;
 import com.jme3.scene.Geometry;
 import com.jme3.scene.Node;
@@ -28,8 +34,6 @@ import com.jme3.scene.shape.Box;
 import com.jme3.scene.shape.Quad;
 import com.jme3.scene.shape.Sphere;
 import com.jme3.scene.shape.Torus;
-import com.jme3.effect.ParticleEmitter;
-import com.jme3.effect.ParticleMesh;
 
 import net.limitmedia.pong3d.net.NetworkClient;
 
@@ -80,7 +84,7 @@ public class GameState extends BaseAppState implements ActionListener {
     private String currentNetworkMessage = "";
     private boolean networkReady = false;
 
-    private final float halfWidth = 5.5f;
+    private final float halfWidth = 6.25f;
     private final float halfDepth = 9f;
 
     private final float ballRadius = 0.25f;
@@ -109,6 +113,12 @@ public class GameState extends BaseAppState implements ActionListener {
     private final Random random = new Random();
 
     private FilterPostProcessor postProcessor;
+
+    private final Vector3f bounceStartVel = new Vector3f();
+    private final Vector3f bounceTargetVel = new Vector3f();
+    private final Vector3f bounceMix = new Vector3f();
+    private float bounceBlendTime = 0f;
+    private float bounceBlendDuration = 0f;
 
     private final Vector3f networkPlayerTarget = new Vector3f();
     private final Vector3f networkEnemyTarget = new Vector3f();
@@ -319,11 +329,25 @@ public class GameState extends BaseAppState implements ActionListener {
         im.addMapping("PAUSE", new KeyTrigger(KeyInput.KEY_ESCAPE));
         im.addListener(this, "PL_LEFT","PL_RIGHT","PAUSE");
 
-        // Postprocessing: Bloom + FXAA (Glow sichtbar)
+        // Postprocessing: Bloom, SSAO, God Rays, Tiefenunschärfe und FXAA für ein modernes Bild
         postProcessor = new FilterPostProcessor(app.getAssetManager());
         BloomFilter bloom = new BloomFilter(BloomFilter.GlowMode.Scene);
-        bloom.setBloomIntensity(0.7f);
+        bloom.setBloomIntensity(0.85f);
         postProcessor.addFilter(bloom);
+
+        SSAOFilter ssao = new SSAOFilter(3.2f, 4.5f, 0.25f, 0.12f);
+        postProcessor.addFilter(ssao);
+
+        LightScatteringFilter lightScattering = new LightScatteringFilter(sun.getDirection().negate().mult(120f));
+        lightScattering.setLightDensity(1.05f);
+        postProcessor.addFilter(lightScattering);
+
+        DepthOfFieldFilter depthOfField = new DepthOfFieldFilter();
+        depthOfField.setFocusDistance(25f);
+        depthOfField.setFocusRange(18f);
+        depthOfField.setBlurScale(1.2f);
+        postProcessor.addFilter(depthOfField);
+
         postProcessor.addFilter(new FXAAFilter());
         app.getViewPort().addProcessor(postProcessor);
 
@@ -398,6 +422,8 @@ public class GameState extends BaseAppState implements ActionListener {
             clampPaddleX(enemyPaddle);
         }
 
+        updateBallResponse(tpf);
+
         // Ball
         ball.move(ballVel.x * tpf, ballVel.y * tpf, ballVel.z * tpf);
         ballVel.y += gravity * tpf;
@@ -423,15 +449,21 @@ public class GameState extends BaseAppState implements ActionListener {
         }
 
         // Walls X
-        if (ball.getLocalTranslation().x > halfWidth - ballRadius && ballVel.x > 0) {
-            ballVel.x *= -1;
-            ballVel.y = Math.max(ballVel.y, 2.5f);
+        Vector3f ballPos = ball.getLocalTranslation();
+        if (ballPos.x > halfWidth - ballRadius && ballVel.x > 0) {
+            ball.setLocalTranslation(halfWidth - ballRadius, ballPos.y, ballPos.z);
+            float newX = -FastMath.abs(ballVel.x) * (0.88f + random.nextFloat() * 0.12f);
+            float newZ = ballVel.z * (0.98f + random.nextFloat() * 0.05f);
+            float newY = Math.max(ballVel.y, 3.1f + FastMath.abs(ballVel.z) * 0.05f);
+            scheduleBallResponse(newX, newY, newZ, 0.14f);
             triggerCameraShake(0.18f, 0.18f);
             spawnImpactEffect(ball.getLocalTranslation().clone(), playerColor);
-        }
-        if (ball.getLocalTranslation().x < -halfWidth + ballRadius && ballVel.x < 0) {
-            ballVel.x *= -1;
-            ballVel.y = Math.max(ballVel.y, 2.5f);
+        } else if (ballPos.x < -halfWidth + ballRadius && ballVel.x < 0) {
+            ball.setLocalTranslation(-halfWidth + ballRadius, ballPos.y, ballPos.z);
+            float newX = FastMath.abs(ballVel.x) * (0.88f + random.nextFloat() * 0.12f);
+            float newZ = ballVel.z * (0.98f + random.nextFloat() * 0.05f);
+            float newY = Math.max(ballVel.y, 3.1f + FastMath.abs(ballVel.z) * 0.05f);
+            scheduleBallResponse(newX, newY, newZ, 0.14f);
             triggerCameraShake(0.18f, 0.18f);
             spawnImpactEffect(ball.getLocalTranslation().clone(), enemyColor);
         }
@@ -461,7 +493,25 @@ public class GameState extends BaseAppState implements ActionListener {
             resetBall(true);
         }
 
+        limitBallSpeed();
         updateHud();
+    }
+
+    private void updateBallResponse(float tpf) {
+        if (bounceBlendDuration <= 0f) {
+            return;
+        }
+        bounceBlendTime = Math.min(bounceBlendTime + tpf, bounceBlendDuration);
+        float alpha = bounceBlendTime / bounceBlendDuration;
+        float smooth = smootherStep(alpha);
+        bounceMix.set(bounceStartVel).multLocal(1f - smooth);
+        bounceMix.addLocal(bounceTargetVel.x * smooth, bounceTargetVel.y * smooth, bounceTargetVel.z * smooth);
+        ballVel.set(bounceMix);
+        if (alpha >= 0.999f) {
+            ballVel.set(bounceTargetVel);
+            bounceBlendDuration = 0f;
+        }
+        limitBallSpeed();
     }
 
     private void updateCameraFollow(float tpf) {
@@ -599,11 +649,23 @@ public class GameState extends BaseAppState implements ActionListener {
     }
 
     private void limitBallSpeed() {
-        float max = 22f, min = 4.0f;
-        if (Math.abs(ballVel.x) < min) ballVel.x = FastMath.sign(ballVel.x) * min;
-        if (Math.abs(ballVel.z) < min) ballVel.z = FastMath.sign(ballVel.z) * min;
+        float max = 26f;
+        float min = 6f;
+        float horizontal = FastMath.sqrt(ballVel.x * ballVel.x + ballVel.z * ballVel.z);
+        if (horizontal < min) {
+            float scale = min / Math.max(horizontal, 1e-3f);
+            ballVel.x *= scale;
+            ballVel.z *= scale;
+        } else if (horizontal > max) {
+            float scale = max / horizontal;
+            ballVel.x *= scale;
+            ballVel.z *= scale;
+        }
         ballVel.x = FastMath.clamp(ballVel.x, -max, max);
         ballVel.z = FastMath.clamp(ballVel.z, -max, max);
+        if (Math.abs(ballVel.y) > max) {
+            ballVel.y = ballVel.y >= 0f ? max : -max;
+        }
     }
 
     private void resetBall(boolean towardsEnemy) {
@@ -612,6 +674,10 @@ public class GameState extends BaseAppState implements ActionListener {
         ballVel.set((random.nextFloat() - 0.5f) * 5f, 0, towardsEnemy ? -6f : 6f);
         playerVelocity = 0f;
         enemyVelocity = 0f;
+        bounceBlendDuration = 0f;
+        bounceBlendTime = 0f;
+        bounceStartVel.set(ballVel);
+        bounceTargetVel.set(ballVel);
     }
 
     @Override
@@ -817,14 +883,29 @@ public class GameState extends BaseAppState implements ActionListener {
         float diff = ball.getLocalTranslation().x - paddle.getLocalTranslation().x;
         float offset = FastMath.clamp(diff / 1.4f, -1f, 1f);
         float incomingSpeed = FastMath.abs(ballVel.z);
-        float targetSpeed = FastMath.clamp(incomingSpeed * 1.08f + 0.5f, 6f, 24f);
-        ballVel.z = playerSide ? -targetSpeed : targetSpeed;
-        ballVel.x = FastMath.interpolateLinear(0.65f, ballVel.x, offset * targetSpeed);
-        ballVel.y = playerSide ? 8f : 6f;
-        limitBallSpeed();
+        float targetSpeed = FastMath.clamp(incomingSpeed * 1.08f + 0.6f, 6.5f, 24f);
+        float horizontalAim = FastMath.interpolateLinear(0.35f, ballVel.x, offset * targetSpeed * 0.85f);
+        float verticalBoost = (playerSide ? 7.6f : 6.8f) + FastMath.abs(offset) * 3.2f;
+        float targetZ = playerSide ? -targetSpeed : targetSpeed;
+        scheduleBallResponse(horizontalAim, verticalBoost, targetZ, 0.2f);
+
+        float clampedZ = playerSide ? halfDepth - 0.62f : -halfDepth + 0.62f;
+        ball.setLocalTranslation(ball.getLocalTranslation().x, ball.getLocalTranslation().y, clampedZ);
 
         triggerCameraShake(playerSide ? 0.35f : 0.28f, 0.28f);
         spawnImpactEffect(ball.getLocalTranslation().clone(), playerSide ? playerColor : enemyColor);
+    }
+
+    private void scheduleBallResponse(float targetX, float targetY, float targetZ, float duration) {
+        bounceStartVel.set(ballVel);
+        bounceTargetVel.set(targetX, targetY, targetZ);
+        bounceBlendTime = 0f;
+        bounceBlendDuration = FastMath.clamp(duration, 0.05f, 0.4f);
+    }
+
+    private static float smootherStep(float t) {
+        t = FastMath.clamp(t, 0f, 1f);
+        return t * t * t * (t * (t * 6f - 15f) + 10f);
     }
 
     private void updateCameraShake(float tpf) {
@@ -871,13 +952,32 @@ public class GameState extends BaseAppState implements ActionListener {
         impact.setStartColor(color.clone());
         impact.setEndColor(new ColorRGBA(color.r, color.g, color.b, 0f));
         impact.setParticlesPerSec(0);
-        impact.getParticleInfluencer().setInitialVelocity(new Vector3f(0, 6f, 0));
+        impact.setShape(new EmitterSphereShape(Vector3f.ZERO, 0.32f));
+        impact.getParticleInfluencer().setInitialVelocity(new Vector3f(0, 6.5f, 0));
         impact.getParticleInfluencer().setVelocityVariation(0.8f);
         impact.setMaterial(ball.getMaterial());
         impact.setLocalTranslation(position);
         impact.addControl(new TimedRemovalControl(0.6f));
         effects.attachChild(impact);
         impact.emitAllParticles();
+
+        ParticleEmitter sparks = new ParticleEmitter("impact-sparks", ParticleMesh.Type.Triangle, 18);
+        sparks.setGravity(0, -22f, 0);
+        sparks.setLowLife(0.2f);
+        sparks.setHighLife(0.35f);
+        sparks.setStartSize(0.18f);
+        sparks.setEndSize(0.02f);
+        sparks.setStartColor(color.clone().mult(1.3f));
+        sparks.setEndColor(new ColorRGBA(color.r, color.g, color.b, 0f));
+        sparks.setParticlesPerSec(0);
+        sparks.setShape(new EmitterSphereShape(Vector3f.ZERO, 0.18f));
+        sparks.getParticleInfluencer().setInitialVelocity(new Vector3f(0, 4.5f, 0));
+        sparks.getParticleInfluencer().setVelocityVariation(1.1f);
+        sparks.setMaterial(ball.getMaterial());
+        sparks.setLocalTranslation(position);
+        sparks.addControl(new TimedRemovalControl(0.45f));
+        effects.attachChild(sparks);
+        sparks.emitAllParticles();
     }
 
     private void spawnGoalEffect(boolean playerScored) {
@@ -894,11 +994,30 @@ public class GameState extends BaseAppState implements ActionListener {
         ring.setParticlesPerSec(0);
         ring.getParticleInfluencer().setInitialVelocity(new Vector3f(0, 0, playerScored ? 6f : -6f));
         ring.getParticleInfluencer().setVelocityVariation(0.6f);
+        ring.setShape(new EmitterSphereShape(Vector3f.ZERO, 0.25f));
         ring.setMaterial(ball.getMaterial());
         ring.setLocalTranslation(0, ballRadius + 0.1f, z);
         ring.addControl(new TimedRemovalControl(1.1f));
         effects.attachChild(ring);
         ring.emitAllParticles();
+
+        ParticleEmitter burst = new ParticleEmitter("goal-burst", ParticleMesh.Type.Triangle, 72);
+        burst.setGravity(0, -12f, 0);
+        burst.setLowLife(0.45f);
+        burst.setHighLife(0.8f);
+        burst.setStartSize(0.3f);
+        burst.setEndSize(0.04f);
+        burst.setStartColor(color.clone().mult(1.2f));
+        burst.setEndColor(new ColorRGBA(color.r, color.g, color.b, 0f));
+        burst.setParticlesPerSec(0);
+        burst.setShape(new EmitterSphereShape(Vector3f.ZERO, 0.4f));
+        burst.getParticleInfluencer().setInitialVelocity(new Vector3f(0, 5.2f, playerScored ? -2f : 2f));
+        burst.getParticleInfluencer().setVelocityVariation(1.2f);
+        burst.setMaterial(ball.getMaterial());
+        burst.setLocalTranslation(0, ballRadius + 0.1f, z);
+        burst.addControl(new TimedRemovalControl(0.9f));
+        effects.attachChild(burst);
+        burst.emitAllParticles();
     }
 
     private static class TimedRemovalControl extends AbstractControl {
