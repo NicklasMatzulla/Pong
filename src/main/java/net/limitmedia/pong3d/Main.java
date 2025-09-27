@@ -6,6 +6,12 @@ import net.limitmedia.pong3d.state.GameState;
 import org.lwjgl.glfw.GLFW;
 import org.lwjgl.glfw.GLFWVidMode;
 import net.limitmedia.pong3d.state.MainMenuState;
+import net.limitmedia.pong3d.net.NetworkClient;
+
+import javax.swing.JOptionPane;
+import javax.swing.SwingUtilities;
+
+import java.io.IOException;
 
 public class Main extends SimpleApplication {
 
@@ -31,28 +37,76 @@ public class Main extends SimpleApplication {
         inputManager.setCursorVisible(true);
         setPauseOnLostFocus(false);
         // Menü anhängen im Renderthread
-        enqueue(() -> { 
-            stateManager.attach(new MainMenuState(this, this::startGame, this::toggleFullscreen, this::quit));
+        enqueue(() -> {
+            stateManager.attach(new MainMenuState(this, this::startSinglePlayerGame, this::startMultiplayerGame, this::toggleFullscreen, this::quit));
             return null;
         });
     }
 
-    private void startGame() {
-        // Menü entfernen und Spiel anhängen – alles im Renderthread
+    private void startSinglePlayerGame() {
         enqueue(() -> {
-            MainMenuState menu = stateManager.getState(MainMenuState.class);
-            if (menu != null) stateManager.detach(menu);
+            detachMenu();
             if (stateManager.getState(GameState.class) == null) {
-                stateManager.attach(new GameState(this, () -> {
-                    // Pause anfordern → Menü als Overlay anhängen
-                    if (stateManager.getState(MainMenuState.class) == null) {
-                        stateManager.attach(new MainMenuState(this, this::resumeGame, this::toggleFullscreen, this::quit, true));
-                    }
-                }));
+                attachGameState(new GameState(this, this::openPauseMenu));
             }
             return null;
         });
     }
+
+    private void startMultiplayerGame() {
+        String target = JOptionPane.showInputDialog(null, "Server (host:port)", System.getProperty("pong.server", "localhost:6000"));
+        if (target == null || target.isBlank()) {
+            return;
+        }
+        String host = target;
+        int port = 6000;
+        int idx = target.lastIndexOf(':');
+        if (idx > 0 && idx < target.length() - 1) {
+            host = target.substring(0, idx);
+            try {
+                port = Integer.parseInt(target.substring(idx + 1));
+            } catch (NumberFormatException ex) {
+                JOptionPane.showMessageDialog(null, "Ungültiger Port: " + target.substring(idx + 1));
+                return;
+            }
+        }
+        String playerName = System.getProperty("user.name", "Spieler");
+        final String connectHost = host;
+        final int connectPort = port;
+        final String connectName = playerName;
+        new Thread(() -> {
+            try {
+                NetworkClient client = new NetworkClient(connectHost, connectPort, connectName);
+                enqueue(() -> {
+                    detachMenu();
+                    if (stateManager.getState(GameState.class) == null) {
+                        attachGameState(new GameState(this, this::openPauseMenu, client));
+                    }
+                    return null;
+                });
+            } catch (IOException e) {
+                SwingUtilities.invokeLater(() -> JOptionPane.showMessageDialog(null, "Verbindung fehlgeschlagen: " + e.getMessage()));
+            }
+        }, "Pong-Connect").start();
+    }
+
+    private void openPauseMenu() {
+        if (stateManager.getState(MainMenuState.class) == null) {
+            stateManager.attach(new MainMenuState(this, this::resumeGame, null, this::toggleFullscreen, this::quit, true));
+        }
+    }
+
+    private void attachGameState(GameState gameState) {
+        stateManager.attach(gameState);
+    }
+
+    private void detachMenu() {
+        MainMenuState menu = stateManager.getState(MainMenuState.class);
+        if (menu != null) {
+            stateManager.detach(menu);
+        }
+    }
+
     private void resumeGame() {
         enqueue(() -> {
             GameState gs = stateManager.getState(GameState.class);

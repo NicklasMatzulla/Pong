@@ -27,6 +27,8 @@ import com.jme3.scene.shape.Sphere;
 import com.jme3.effect.ParticleEmitter;
 import com.jme3.effect.ParticleMesh;
 
+import net.limitmedia.pong3d.net.NetworkClient;
+
 import java.util.Random;
 
 /**
@@ -37,10 +39,13 @@ public class GameState extends BaseAppState implements ActionListener {
 
     private final SimpleApplication app;
     private final Runnable onPause;
+    private final NetworkClient networkClient;
+    private final boolean multiplayer;
+    private NetworkClient.Role networkRole = NetworkClient.Role.FRONT;
 
     private final Node root = new Node("game");
     private Geometry playerPaddle, enemyPaddle, ball, table;
-    private Vector3f ballVel = new Vector3f(5f, 0f, -6f);
+    private final Vector3f ballVel = new Vector3f(5f, 0f, -6f);
     private final float paddleSpeed = 12f;
 
     private boolean movePlayerLeft, movePlayerRight, moveEnemyLeft, moveEnemyRight;
@@ -53,8 +58,14 @@ public class GameState extends BaseAppState implements ActionListener {
     private float ballRadius = 0.25f;
 
     public GameState(SimpleApplication app, Runnable onPause) {
+        this(app, onPause, null);
+    }
+
+    public GameState(SimpleApplication app, Runnable onPause, NetworkClient networkClient) {
         this.app = app;
         this.onPause = onPause;
+        this.networkClient = networkClient;
+        this.multiplayer = networkClient != null;
     }
 
     @Override
@@ -170,10 +181,13 @@ public class GameState extends BaseAppState implements ActionListener {
         var im = app.getInputManager();
         im.addMapping("PL_LEFT", new KeyTrigger(KeyInput.KEY_A));
         im.addMapping("PL_RIGHT", new KeyTrigger(KeyInput.KEY_D));
-        im.addMapping("EN_LEFT", new KeyTrigger(KeyInput.KEY_LEFT));
-        im.addMapping("EN_RIGHT", new KeyTrigger(KeyInput.KEY_RIGHT));
+        if (!multiplayer) {
+            im.addMapping("EN_LEFT", new KeyTrigger(KeyInput.KEY_LEFT));
+            im.addMapping("EN_RIGHT", new KeyTrigger(KeyInput.KEY_RIGHT));
+            im.addListener(this, "EN_LEFT", "EN_RIGHT");
+        }
         im.addMapping("PAUSE", new KeyTrigger(KeyInput.KEY_ESCAPE));
-        im.addListener(this, "PL_LEFT","PL_RIGHT","EN_LEFT","EN_RIGHT","PAUSE");
+        im.addListener(this, "PL_LEFT","PL_RIGHT","PAUSE");
 
         // Postprocessing: Bloom + FXAA (Glow sichtbar)
         FilterPostProcessor fpp = new FilterPostProcessor(app.getAssetManager());
@@ -187,6 +201,10 @@ public class GameState extends BaseAppState implements ActionListener {
         Random r = new Random();
         float signZ = r.nextBoolean() ? -1f : 1f;
         ballVel.set( (r.nextFloat()-0.5f)*6f, 0f, signZ * (5f + r.nextFloat()*2f));
+
+        if (multiplayer) {
+            sendNetworkDirection();
+        }
     }
 
     private void attachTrail(Geometry owner, Material baseMat) {
@@ -213,6 +231,11 @@ public class GameState extends BaseAppState implements ActionListener {
 
     @Override
     public void update(float tpf) {
+        if (multiplayer) {
+            applyNetworkState();
+            updateHud();
+            return;
+        }
         // Player movement X
         float dxPlayer = (movePlayerRight ? 1 : 0) - (movePlayerLeft ? 1 : 0);
         playerPaddle.move(dxPlayer * paddleSpeed * tpf, 0, 0);
@@ -312,8 +335,10 @@ public class GameState extends BaseAppState implements ActionListener {
         var im = app.getInputManager();
         im.deleteMapping("PL_LEFT");
         im.deleteMapping("PL_RIGHT");
-        im.deleteMapping("EN_LEFT");
-        im.deleteMapping("EN_RIGHT");
+        if (!multiplayer) {
+            im.deleteMapping("EN_LEFT");
+            im.deleteMapping("EN_RIGHT");
+        }
         im.deleteMapping("PAUSE");
         im.deleteMapping("CAM_TOGGLE");
         if (hud != null) hud.removeFromParent();
@@ -321,14 +346,73 @@ public class GameState extends BaseAppState implements ActionListener {
         app.getFlyByCamera().setEnabled(false);
     }
 
-    @Override protected void cleanup(Application app) { }
+    @Override
+    protected void cleanup(Application app) {
+        if (networkClient != null) {
+            networkClient.close();
+        }
+    }
 
     @Override
     public void onAction(String name, boolean isPressed, float tpf) {
-        
+        switch (name) {
+            case "PL_LEFT": movePlayerLeft = isPressed; break;
+            case "PL_RIGHT": movePlayerRight = isPressed; break;
+            case "EN_LEFT": moveEnemyLeft = isPressed; break;
+            case "EN_RIGHT": moveEnemyRight = isPressed; break;
+            case "PAUSE":
+                if (!isPressed && onPause != null) {
+                    onPause.run();
+                }
+                break;
+            case "CAM_TOGGLE":
+                if (!isPressed) {
+                    boolean enabled = app.getFlyByCamera().isDragToRotate();
+                    app.getFlyByCamera().setDragToRotate(!enabled);
+                    app.getInputManager().setCursorVisible(enabled);
+                }
+                break;
+        }
+        if (multiplayer && ("PL_LEFT".equals(name) || "PL_RIGHT".equals(name))) {
+            sendNetworkDirection();
+        }
     }
 
     public void resume() {
+        movePlayerLeft = movePlayerRight = moveEnemyLeft = moveEnemyRight = false;
+        if (multiplayer) {
+            sendNetworkDirection();
+        }
+    }
+
+    private void sendNetworkDirection() {
+        if (networkClient == null) return;
+        int dir = (movePlayerRight ? 1 : 0) - (movePlayerLeft ? 1 : 0);
+        networkClient.sendDirection(dir);
+    }
+
+    private void applyNetworkState() {
+        if (networkClient == null) return;
+        var state = networkClient.getWorldState();
+        if (state == null) return;
+        networkRole = networkClient.getRole();
+
+        float myX = networkRole == NetworkClient.Role.FRONT ? state.frontX() : state.backX();
+        float oppX = networkRole == NetworkClient.Role.FRONT ? state.backX() : state.frontX();
+        float ballZServer = state.ballZ();
+        float localBallZ = networkRole == NetworkClient.Role.FRONT ? ballZServer : -ballZServer;
+
+        playerPaddle.setLocalTranslation(myX, playerPaddle.getLocalTranslation().y, playerPaddle.getLocalTranslation().z);
+        enemyPaddle.setLocalTranslation(oppX, enemyPaddle.getLocalTranslation().y, enemyPaddle.getLocalTranslation().z);
+        ball.setLocalTranslation(state.ballX(), ball.getLocalTranslation().y, localBallZ);
+
+        if (networkRole == NetworkClient.Role.FRONT) {
+            scorePlayer = state.scoreFront();
+            scoreEnemy = state.scoreBack();
+        } else {
+            scorePlayer = state.scoreBack();
+            scoreEnemy = state.scoreFront();
+        }
     }
 
     /** Simple follower that leaves a fading trail by sampling owner's transform with delay. */

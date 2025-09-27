@@ -19,21 +19,23 @@ import com.jme3.scene.shape.Quad;
 public class MainMenuState extends BaseAppState implements ActionListener {
 
     private final SimpleApplication app;
-    private final Runnable onPlay;
+    private final Runnable onPlaySingle;
+    private final Runnable onPlayOnline;
     private final Runnable onToggleFullscreen;
     private final Runnable onQuit;
     private final boolean isPauseMenu;
 
     private final Node gui = new Node("MainMenu");
-    private BitmapText title, line1, line2, line3, hint;
+    private BitmapText title, line1, line2, line3, line4, hint;
 
-    public MainMenuState(SimpleApplication app, Runnable onPlay, Runnable onToggleFullscreen, Runnable onQuit) {
-        this(app, onPlay, onToggleFullscreen, onQuit, false);
+    public MainMenuState(SimpleApplication app, Runnable onPlaySingle, Runnable onPlayOnline, Runnable onToggleFullscreen, Runnable onQuit) {
+        this(app, onPlaySingle, onPlayOnline, onToggleFullscreen, onQuit, false);
     }
 
-    public MainMenuState(SimpleApplication app, Runnable onPlay, Runnable onToggleFullscreen, Runnable onQuit, boolean isPauseMenu) {
+    public MainMenuState(SimpleApplication app, Runnable onPlaySingle, Runnable onPlayOnline, Runnable onToggleFullscreen, Runnable onQuit, boolean isPauseMenu) {
         this.app = app;
-        this.onPlay = onPlay;
+        this.onPlaySingle = onPlaySingle;
+        this.onPlayOnline = onPlayOnline;
         this.onToggleFullscreen = onToggleFullscreen;
         this.onQuit = onQuit;
         this.isPauseMenu = isPauseMenu;
@@ -59,28 +61,50 @@ public class MainMenuState extends BaseAppState implements ActionListener {
         gui.attachChild(title);
 
         line1 = new BitmapText(font, false);
-        line1.setSize(24); line1.setText(isPauseMenu ? "[1] Weiter" : "[1] Spielen");
+        line1.setSize(24); line1.setText(isPauseMenu ? "[1] Weiter" : "[1] Einzelspieler");
         centerX(line1); line1.setLocalTranslation(line1.getLocalTranslation().x, app.getCamera().getHeight() - 200, 1);
         gui.attachChild(line1);
 
         line2 = new BitmapText(font, false);
-        line2.setSize(24); line2.setText("[2] Vollbild umschalten");
+        line2.setSize(24);
+        if (!isPauseMenu && onPlayOnline != null) {
+            line2.setText("[2] Multiplayer verbinden");
+        } else {
+            line2.setText(isPauseMenu ? "[2] Vollbild umschalten" : "[2] Vollbild umschalten");
+        }
         centerX(line2); line2.setLocalTranslation(line2.getLocalTranslation().x, app.getCamera().getHeight() - 240, 1);
         gui.attachChild(line2);
 
         line3 = new BitmapText(font, false);
-        line3.setSize(24); line3.setText("[3] Beenden");
+        line3.setSize(24);
+        if (!isPauseMenu && onPlayOnline != null) {
+            line3.setText("[3] Vollbild umschalten");
+        } else {
+            line3.setText(isPauseMenu ? "[3] Beenden" : "[3] Beenden");
+        }
         centerX(line3); line3.setLocalTranslation(line3.getLocalTranslation().x, app.getCamera().getHeight() - 280, 1);
         gui.attachChild(line3);
 
+        if (!isPauseMenu && onPlayOnline != null) {
+            line4 = new BitmapText(font, false);
+            line4.setSize(24); line4.setText("[4] Beenden");
+            centerX(line4); line4.setLocalTranslation(line4.getLocalTranslation().x, app.getCamera().getHeight() - 320, 1);
+            gui.attachChild(line4);
+        }
+
         hint = new BitmapText(font, false);
-        hint.setSize(18); hint.setText("A/D bewegen • ESC Pause • 1/2/3 Menü");
+        hint.setSize(18);
+        hint.setText(onPlayOnline != null && !isPauseMenu ? "A/D bewegen • ESC Pause • 1/2/3/4 Menü" : "A/D bewegen • ESC Pause • 1/2/3 Menü");
         centerX(hint); hint.setLocalTranslation(hint.getLocalTranslation().x, 60, 1);
         gui.attachChild(hint);
 
         app.getInputManager().addMapping("M_1", new KeyTrigger(KeyInput.KEY_1));
         app.getInputManager().addMapping("M_2", new KeyTrigger(KeyInput.KEY_2));
         app.getInputManager().addMapping("M_3", new KeyTrigger(KeyInput.KEY_3));
+        if (!isPauseMenu && onPlayOnline != null) {
+            app.getInputManager().addMapping("M_4", new KeyTrigger(KeyInput.KEY_4));
+            app.getInputManager().addListener(this, "M_4");
+        }
         app.getInputManager().addListener(this, "M_1", "M_2", "M_3");
     }
 
@@ -93,9 +117,28 @@ public class MainMenuState extends BaseAppState implements ActionListener {
     public void onAction(String name, boolean isPressed, float tpf) {
         if (isPressed) return;
         switch (name) {
-            case "M_1": if (onPlay != null) onPlay.run(); break;
-            case "M_2": if (onToggleFullscreen != null) onToggleFullscreen.run(); break;
-            case "M_3": if (onQuit != null) onQuit.run(); break;
+            case "M_1":
+                if (onPlaySingle != null) onPlaySingle.run();
+                break;
+            case "M_2":
+                if (!isPauseMenu && onPlayOnline != null) {
+                    onPlayOnline.run();
+                } else if (onToggleFullscreen != null) {
+                    onToggleFullscreen.run();
+                }
+                break;
+            case "M_3":
+                if (!isPauseMenu && onPlayOnline != null) {
+                    if (onToggleFullscreen != null) onToggleFullscreen.run();
+                } else if (onQuit != null) {
+                    onQuit.run();
+                }
+                break;
+            case "M_4":
+                if (!isPauseMenu && onPlayOnline != null && onQuit != null) {
+                    onQuit.run();
+                }
+                break;
         }
     }
 
@@ -110,6 +153,9 @@ public class MainMenuState extends BaseAppState implements ActionListener {
         app.getInputManager().deleteMapping("M_1");
         app.getInputManager().deleteMapping("M_2");
         app.getInputManager().deleteMapping("M_3");
+        if (!isPauseMenu && onPlayOnline != null) {
+            app.getInputManager().deleteMapping("M_4");
+        }
     }
 
     @Override protected void cleanup(Application app) { }
