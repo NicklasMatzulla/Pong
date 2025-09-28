@@ -14,9 +14,11 @@ import com.jme3.scene.shape.Box;
 import com.jme3.scene.shape.Line;
 import com.jme3.scene.shape.Sphere;
 import com.jme3.scene.shape.Torus;
+import net.limitmedia.pong.client.presentation.ThemeColorUtils;
 import net.limitmedia.pong.core.physics.ArenaDimensions;
 import net.limitmedia.pong.core.physics.BallState;
 import net.limitmedia.pong.core.physics.PaddleState;
+import net.limitmedia.pong.core.presentation.ThemeDefinition;
 
 /**
  * Builds and animates the 3D arena, keeping the rendering code separate from
@@ -25,6 +27,7 @@ import net.limitmedia.pong.core.physics.PaddleState;
 public final class ArenaScene {
     private final ArenaDimensions dimensions;
     private final boolean enableBallTrail;
+    private final ThemeDefinition theme;
 
     private Node environmentRoot;
     private Node ballNode;
@@ -33,12 +36,18 @@ public final class ArenaScene {
     private Geometry rightPaddle;
     private Geometry auroraRing;
     private Material auroraMaterial;
+    private Material trailMaterial;
+    private Material floorMaterial;
+    private Material ballMaterial;
     private final Vector3f lastBallPosition = new Vector3f();
     private float environmentTimer;
+    private final float hueShiftSpeed;
 
-    public ArenaScene(ArenaDimensions dimensions, boolean enableBallTrail) {
+    public ArenaScene(ArenaDimensions dimensions, boolean enableBallTrail, ThemeDefinition theme) {
         this.dimensions = dimensions;
         this.enableBallTrail = enableBallTrail;
+        this.theme = theme;
+        this.hueShiftSpeed = theme.effects().hueShiftSpeed();
     }
 
     public void attach(Node rootNode, AssetManager assets) {
@@ -46,18 +55,18 @@ public final class ArenaScene {
         rootNode.attachChild(environmentRoot);
 
         Geometry table = new Geometry("ArenaFloor", new Box(dimensions.width() / 2f, 0.15f, dimensions.depth() / 2f));
-        Material floorMat = new Material(assets, "Common/MatDefs/Light/Lighting.j3md");
-        floorMat.setBoolean("UseMaterialColors", true);
-        floorMat.setColor("Diffuse", new ColorRGBA(0.18f, 0.2f, 0.24f, 1f));
-        floorMat.setColor("Ambient", new ColorRGBA(0.08f, 0.09f, 0.12f, 1f));
-        table.setMaterial(floorMat);
+        floorMaterial = new Material(assets, "Common/MatDefs/Light/Lighting.j3md");
+        floorMaterial.setBoolean("UseMaterialColors", true);
+        floorMaterial.setColor("Diffuse", ThemeColorUtils.fromHex(theme.arena().floorDiffuse(), 1f));
+        floorMaterial.setColor("Ambient", ThemeColorUtils.fromHex(theme.arena().floorAmbient(), 1f));
+        table.setMaterial(floorMaterial);
         table.setShadowMode(RenderQueue.ShadowMode.Receive);
         environmentRoot.attachChild(table);
 
         WireBox bounds = new WireBox(dimensions.width() / 2f, dimensions.height() / 2f, dimensions.depth() / 2f);
         Geometry boundsGeom = new Geometry("Bounds", bounds);
         Material boundsMat = new Material(assets, "Common/MatDefs/Misc/Unshaded.j3md");
-        boundsMat.setColor("Color", new ColorRGBA(0.25f, 0.3f, 0.35f, 0.55f));
+        boundsMat.setColor("Color", ThemeColorUtils.fromHex(theme.arena().boundsColor(), 0.55f));
         boundsMat.getAdditionalRenderState().setBlendMode(RenderState.BlendMode.Alpha);
         boundsGeom.setMaterial(boundsMat);
         boundsGeom.setQueueBucket(RenderQueue.Bucket.Transparent);
@@ -66,7 +75,7 @@ public final class ArenaScene {
         Torus ring = new Torus(64, 128, 0.35f, dimensions.width());
         auroraRing = new Geometry("Aurora", ring);
         auroraMaterial = new Material(assets, "Common/MatDefs/Misc/Unshaded.j3md");
-        auroraMaterial.setColor("Color", new ColorRGBA(0.3f, 0.5f, 0.6f, 0.25f));
+        auroraMaterial.setColor("Color", ThemeColorUtils.fromHex(theme.arena().auroraColor(), theme.arena().auroraOpacity()));
         auroraMaterial.getAdditionalRenderState().setBlendMode(RenderState.BlendMode.Alpha);
         auroraRing.setMaterial(auroraMaterial);
         auroraRing.rotate(FastMath.HALF_PI, 0, 0);
@@ -84,8 +93,8 @@ public final class ArenaScene {
         }
         rootNode.attachChild(ballNode);
 
-        leftPaddle = buildPaddleGeometry(assets, new ColorRGBA(0.4f, 0.72f, 0.92f, 1f));
-        rightPaddle = buildPaddleGeometry(assets, new ColorRGBA(0.92f, 0.5f, 0.8f, 1f));
+        leftPaddle = buildPaddleGeometry(assets, ThemeColorUtils.fromHex(theme.paddles().leftColor(), 1f));
+        rightPaddle = buildPaddleGeometry(assets, ThemeColorUtils.fromHex(theme.paddles().rightColor(), 1f));
         rootNode.attachChild(leftPaddle);
         rootNode.attachChild(rightPaddle);
     }
@@ -108,8 +117,8 @@ public final class ArenaScene {
     public void animate(float tpf) {
         environmentTimer += tpf;
         if (auroraMaterial != null) {
-            float hue = (FastMath.sin(environmentTimer * 0.3f) * 0.5f) + 0.5f;
-            ColorRGBA color = fromHsv(hue, 0.45f, 0.75f, 0.28f);
+            float hue = (FastMath.sin(environmentTimer * hueShiftSpeed) * 0.5f) + 0.5f;
+            ColorRGBA color = fromHsv(hue, 0.45f, 0.75f, theme.arena().auroraOpacity());
             auroraMaterial.setColor("Color", color);
         }
         if (auroraRing != null) {
@@ -133,33 +142,33 @@ public final class ArenaScene {
     }
 
     private Geometry buildBallGeometry(AssetManager assets) {
-        Geometry geometry = new Geometry("Ball", new Sphere(32, 32, 0.6f));
-        Material mat = new Material(assets, "Common/MatDefs/Light/Lighting.j3md");
-        mat.setBoolean("UseMaterialColors", true);
-        mat.setColor("Diffuse", new ColorRGBA(0.82f, 0.86f, 1f, 1f));
-        mat.setColor("Ambient", new ColorRGBA(0.24f, 0.32f, 0.45f, 1f));
-        mat.setColor("GlowColor", new ColorRGBA(0.35f, 0.55f, 1f, 1f));
-        mat.getAdditionalRenderState().setBlendMode(RenderState.BlendMode.Alpha);
-        geometry.setMaterial(mat);
+        Geometry geometry = new Geometry("Ball", new Sphere(48, 48, theme.ball().radius()));
+        ballMaterial = new Material(assets, "Common/MatDefs/Light/Lighting.j3md");
+        ballMaterial.setBoolean("UseMaterialColors", true);
+        ballMaterial.setColor("Diffuse", ThemeColorUtils.fromHex(theme.ball().diffuse(), 1f));
+        ballMaterial.setColor("Ambient", ThemeColorUtils.fromHex(theme.ball().ambient(), 1f));
+        ballMaterial.setColor("GlowColor", ThemeColorUtils.fromHex(theme.ball().glow(), 1f));
+        ballMaterial.getAdditionalRenderState().setBlendMode(RenderState.BlendMode.Alpha);
+        geometry.setMaterial(ballMaterial);
         geometry.setShadowMode(RenderQueue.ShadowMode.CastAndReceive);
-        geometry.move(0, 0.6f, 0);
+        geometry.move(0, theme.ball().radius(), 0);
         return geometry;
     }
 
     private Geometry buildBallTrail(AssetManager assets) {
         Line streak = new Line(Vector3f.ZERO.clone(), Vector3f.ZERO.clone());
-        streak.setLineWidth(2f);
+        streak.setLineWidth(theme.ball().trailWidth());
         Geometry geometry = new Geometry("BallTrail", streak);
-        Material material = new Material(assets, "Common/MatDefs/Misc/Unshaded.j3md");
-        material.setColor("Color", new ColorRGBA(0.35f, 0.6f, 1f, 0.45f));
-        material.getAdditionalRenderState().setBlendMode(RenderState.BlendMode.Alpha);
-        geometry.setMaterial(material);
+        trailMaterial = new Material(assets, "Common/MatDefs/Misc/Unshaded.j3md");
+        trailMaterial.setColor("Color", ThemeColorUtils.fromHex(theme.ball().trailColor(), theme.effects().trailFade()));
+        trailMaterial.getAdditionalRenderState().setBlendMode(RenderState.BlendMode.Alpha);
+        geometry.setMaterial(trailMaterial);
         geometry.setQueueBucket(RenderQueue.Bucket.Transparent);
         return geometry;
     }
 
     private Geometry buildPaddleGeometry(AssetManager assets, ColorRGBA tint) {
-        Geometry geometry = new Geometry("Paddle", new Box(1.2f, 2.4f, 0.25f));
+        Geometry geometry = new Geometry("Paddle", new Box(theme.paddles().halfWidth(), theme.paddles().halfHeight(), theme.paddles().depth()));
         Material mat = new Material(assets, "Common/MatDefs/Light/Lighting.j3md");
         mat.setBoolean("UseMaterialColors", true);
         mat.setColor("Diffuse", tint);

@@ -21,6 +21,7 @@ public record GameConfig(
         @JsonProperty("audio") AudioSettings audio,
         @JsonProperty("gameplay") GameplaySettings gameplay,
         @JsonProperty("accessibility") AccessibilitySettings accessibility,
+        @JsonProperty("presentation") PresentationSettings presentation,
         @JsonProperty("locale") Locale locale
 ) {
     private static final ObjectMapper YAML_MAPPER = new ObjectMapper(new YAMLFactory());
@@ -34,6 +35,8 @@ public record GameConfig(
         Objects.requireNonNull(audio, "audio");
         Objects.requireNonNull(gameplay, "gameplay");
         Objects.requireNonNull(accessibility, "accessibility");
+        presentation = presentation == null ? PresentationSettings.defaults() : presentation;
+        Objects.requireNonNull(presentation, "presentation");
         locale = locale == null ? Locale.getDefault() : locale;
     }
 
@@ -55,7 +58,7 @@ public record GameConfig(
     }
 
     public GameConfig withLocale(Locale newLocale) {
-        return new GameConfig(video, audio, gameplay, accessibility, newLocale);
+        return new GameConfig(video, audio, gameplay, accessibility, presentation, newLocale);
     }
 
     public record VideoSettings(
@@ -172,5 +175,23 @@ public record GameConfig(
         }
 
         public enum ColorBlindMode { OFF, DEUTERANOPIA, PROTANOPIA, TRITANOPIA }
+    }
+
+    public record PresentationSettings(
+            @JsonProperty("theme") String theme,
+            @JsonProperty("hudTheme") String hudTheme,
+            @JsonProperty("enableBloom") boolean enableBloom,
+            @JsonProperty("enableMotionBlur") boolean enableMotionBlur,
+            @JsonProperty("backgroundStyle") String backgroundStyle
+    ) {
+        public PresentationSettings {
+            theme = (theme == null || theme.isBlank()) ? "neon" : theme.trim();
+            hudTheme = (hudTheme == null || hudTheme.isBlank()) ? theme : hudTheme.trim();
+            backgroundStyle = (backgroundStyle == null || backgroundStyle.isBlank()) ? "aurora" : backgroundStyle.trim();
+        }
+
+        public static PresentationSettings defaults() {
+            return new PresentationSettings("neon", "neon", true, true, "aurora");
+        }
     }
 }

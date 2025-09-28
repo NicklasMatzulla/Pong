@@ -1,13 +1,19 @@
+:root {
+    -fx-hud-accent: #38b8ff;
+    -fx-hud-glass-top: rgba(22, 30, 42, 0.92);
+    -fx-hud-glass-bottom: rgba(16, 24, 34, 0.88);
+}
+
 .hud-stage {
     -fx-background-color: transparent;
     -fx-padding: 32px;
 }
 
 .hud-root {
-    -fx-background-color: linear-gradient(to bottom right, rgba(22, 30, 42, 0.92), rgba(16, 24, 34, 0.88));
+    -fx-background-color: linear-gradient(to bottom right, var(-fx-hud-glass-top), var(-fx-hud-glass-bottom));
     -fx-background-radius: 24px;
     -fx-border-radius: 24px;
-    -fx-border-color: rgba(80, 160, 255, 0.45);
+    -fx-border-color: var(-fx-hud-accent, rgba(80, 160, 255, 0.45));
     -fx-border-width: 1.5px;
     -fx-effect: dropshadow(gaussian, rgba(0, 128, 255, 0.35), 36, 0.6, 0, 12);
     -fx-font-family: "Segoe UI", "Inter", "Roboto", sans-serif;
@@ -44,7 +50,7 @@
 }
 
 .slider .thumb {
-    -fx-background-color: linear-gradient(to bottom right, #38b8ff, #247dff);
+    -fx-background-color: linear-gradient(to bottom right, var(-fx-hud-accent, #38b8ff), derive(var(-fx-hud-accent, #247dff), -15%));
     -fx-background-radius: 50%;
     -fx-effect: dropshadow(gaussian, rgba(36, 125, 255, 0.6), 10, 0.3, 0, 2);
 }

@@ -9,6 +9,7 @@ dependencies {
     implementation("org.jmonkeyengine:jme3-desktop:3.6.1-stable")
     implementation("org.jmonkeyengine:jme3-jogg:3.6.1-stable")
     implementation("org.jmonkeyengine:jme3-plugins:3.6.1-stable")
+    implementation("org.jmonkeyengine:jme3-effects:3.6.1-stable")
     implementation("io.netty:netty-all:4.1.110.Final")
     implementation("org.openjfx:javafx-controls:23")
     implementation("org.openjfx:javafx-graphics:23")

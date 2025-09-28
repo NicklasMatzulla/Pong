@@ -19,6 +19,16 @@ A modular 3D Pong prototype built with jMonkeyEngine, JavaFX, Netty, and OpenAL.
 | Multiplayer client waits forever on match start | The master server emits a state broadcast as soon as a match opens so clients leave the waiting screen immediately. |
 | Camera shake felt disorienting | Shake intensity is clamped by accessibility settings, and the rig resets automatically when the impulse fades. |
 
+## Presentation & Asset Pipeline
+
+The client now loads a JSON-driven presentation theme (`core/src/main/resources/themes`) that wires arena colours, HUD styling,
+and audio cues into the gameplay at runtime. Place custom meshes, textures, particle atlases, audio loops, and iconography inside
+`client/src/main/resources/assets`. The packaged `neon.json` theme references these paths and can be hot-swapped by editing
+`presentation.theme` in `config/default.yml`.
+
+Shader stubs for glow and motion blur live in `client/src/main/resources/shaders` and can be replaced with bespoke GLSL when the
+final art direction is locked.
+
 ## Testing
 
 Unit tests cover physics rebound behaviour, lag compensation, audio mixing, and the new camera rig helper. Run all tests with:

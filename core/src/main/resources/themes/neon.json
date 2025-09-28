@@ -1,0 +1,48 @@
+{
+  "name": "neon",
+  "arena": {
+    "floorDiffuse": "#1b2231",
+    "floorAmbient": "#0f141f",
+    "boundsColor": "#3c4d64b0",
+    "backgroundColor": "#04070b",
+    "auroraColor": "#4cd3ff",
+    "auroraOpacity": 0.24,
+    "auroraSpeed": 0.32
+  },
+  "paddles": {
+    "leftColor": "#4cd3ff",
+    "rightColor": "#ff6ad5",
+    "halfWidth": 1.25,
+    "halfHeight": 2.5,
+    "depth": 0.22
+  },
+  "ball": {
+    "diffuse": "#f6fbff",
+    "ambient": "#34405c",
+    "glow": "#4cd3ff",
+    "trailColor": "#4cd3ff80",
+    "radius": 0.58,
+    "trailWidth": 3.0
+  },
+  "effects": {
+    "trailFade": 0.42,
+    "hueShiftSpeed": 0.28,
+    "shakeMultiplier": 0.85,
+    "glowShader": "shaders/glow.frag",
+    "motionBlurShader": "shaders/motion_blur.frag"
+  },
+  "ui": {
+    "stylesheet": "ui/themes/neon.css",
+    "fontFamily": "Inter",
+    "accentColor": "#4cd3ff",
+    "iconSet": "assets/ui/icons/neon"
+  },
+  "audio": {
+    "menuLoop": "assets/audio/menu/lofi_menu.ogg",
+    "matchLoop": "assets/audio/match/cyber_match.ogg",
+    "bounce": "assets/audio/sfx/bounce_soft.ogg",
+    "goal": "assets/audio/sfx/goal_swell.ogg",
+    "powerUp": "assets/audio/sfx/power_up.ogg",
+    "countdown": "assets/audio/voice/countdown.ogg"
+  }
+}

@@ -16,10 +16,12 @@ import net.limitmedia.pong.client.gameplay.CameraRig;
 import net.limitmedia.pong.client.input.MousePaddleInput;
 import net.limitmedia.pong.client.net.ClientNetworkManager;
 import net.limitmedia.pong.client.ui.JavaFxHud;
+import net.limitmedia.pong.client.presentation.ThemeColorUtils;
 import net.limitmedia.pong.core.ai.PredictiveAiController;
 import net.limitmedia.pong.core.audio.AudioMixer;
 import net.limitmedia.pong.core.config.GameConfig;
 import net.limitmedia.pong.core.config.GameConfig.GameplaySettings;
+import net.limitmedia.pong.core.config.GameConfig.PresentationSettings;
 import net.limitmedia.pong.core.gameplay.ArenaProfile;
 import net.limitmedia.pong.core.gameplay.PhysicsTuning;
 import net.limitmedia.pong.core.localization.LocalizationService;
@@ -29,6 +31,8 @@ import net.limitmedia.pong.core.physics.BallState;
 import net.limitmedia.pong.core.physics.PaddleState;
 import net.limitmedia.pong.core.physics.PhysicsEngine;
 import net.limitmedia.pong.core.physics.PhysicsEngine.CollisionEvent;
+import net.limitmedia.pong.core.presentation.ThemeDefinition;
+import net.limitmedia.pong.core.presentation.ThemeLoader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -57,6 +61,7 @@ public final class PongClient extends SimpleApplication {
     private PhysicsEngine physicsEngine;
 
     private GameConfig config;
+    private ThemeDefinition theme;
     private LocalizationService localization;
     private JavaFxHud hud;
     private PredictiveAiController aiController;
@@ -76,7 +81,7 @@ public final class PongClient extends SimpleApplication {
 
         flyCam.setEnabled(false);
         inputManager.setCursorVisible(true);
-        viewPort.setBackgroundColor(new ColorRGBA(0.05f, 0.06f, 0.08f, 1f));
+        viewPort.setBackgroundColor(ThemeColorUtils.fromHex(theme.arena().backgroundColor(), 1f));
 
         initLighting();
         initScene();
@@ -103,6 +108,7 @@ public final class PongClient extends SimpleApplication {
                             GameplaySettings.CameraStyle.ANGLED, 0.12f, true,
                             GameplaySettings.PhysicsSettings.defaults()),
                     new GameConfig.AccessibilitySettings(GameConfig.AccessibilitySettings.ColorBlindMode.OFF, 1f, 0.4f),
+                    GameConfig.PresentationSettings.defaults(),
                     Locale.ENGLISH);
         }
         arenaProfile = ArenaProfile.from(config.gameplay().arenaProfile());
@@ -110,13 +116,26 @@ public final class PongClient extends SimpleApplication {
                 ? toTuning(config.gameplay().physics())
                 : toTuning(config.gameplay().physics()).withoutSpin();
         arena = arenaProfile.dimensions();
-        ballTrailEnabled = config.gameplay().ballTrail();
-        screenShakeScale = config.accessibility().screenShake();
+        ballTrailEnabled = config.gameplay().ballTrail() && theme.effects().trailFade() > 0.05f;
+        loadTheme(config.presentation());
+        screenShakeScale = config.accessibility().screenShake() * theme.effects().shakeMultiplier();
         aiController = buildAiController(config.gameplay());
         mixer.setVolume(AudioMixer.Bus.MASTER, config.audio().master());
         mixer.setVolume(AudioMixer.Bus.MUSIC, config.audio().music());
         mixer.setVolume(AudioMixer.Bus.SFX, config.audio().sfx());
         mixer.setVolume(AudioMixer.Bus.UI, config.audio().ui());
+    }
+
+    private void loadTheme(PresentationSettings presentation) {
+        try {
+            theme = ThemeLoader.load(presentation.theme());
+        } catch (RuntimeException ex) {
+            LOG.warn("Falling back to default theme after failure: {}", ex.getMessage());
+            theme = ThemeLoader.loadDefault();
+        }
+        if (theme == null) {
+            theme = ThemeLoader.loadDefault();
+        }
     }
 
     private void configureSettings() {
@@ -145,16 +164,19 @@ public final class PongClient extends SimpleApplication {
     }
 
     private void initScene() {
-        arenaScene = new ArenaScene(arena, ballTrailEnabled);
+        arenaScene = new ArenaScene(arena, ballTrailEnabled, theme);
         arenaScene.attach(rootNode, assetManager);
 
-        if (config.video().postProcessing()) {
+        if (config.video().postProcessing() && config.presentation().enableBloom()) {
             FilterPostProcessor fpp = new FilterPostProcessor(assetManager);
             BloomFilter bloom = new BloomFilter(BloomFilter.GlowMode.Objects);
             bloom.setBloomIntensity(1.35f);
             bloom.setBlurScale(0.65f);
             fpp.addFilter(bloom);
             viewPort.addProcessor(fpp);
+            if (config.presentation().enableMotionBlur()) {
+                LOG.info("Motion blur shader configured: {}", theme.effects().motionBlurShader());
+            }
         }
 
         cameraRig = new CameraRig(cam);
@@ -163,13 +185,13 @@ public final class PongClient extends SimpleApplication {
     }
 
     private void initAudio() {
-        audioController = new ClientAudioController(mixer, config.audio());
+        audioController = new ClientAudioController(mixer, config.audio(), theme.audio());
         audioController.initialize(assetManager, rootNode);
     }
 
     private void initHud() {
         localization = new LocalizationService(config.locale());
-        hud = new JavaFxHud(localization, mixer);
+        hud = new JavaFxHud(localization, mixer, theme.ui());
         hud.setScale(config.accessibility().uiScale());
         hud.show();
     }

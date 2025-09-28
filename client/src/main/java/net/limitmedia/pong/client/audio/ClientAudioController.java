@@ -8,6 +8,7 @@ import java.io.Closeable;
 import net.limitmedia.pong.core.audio.AudioMixer;
 import net.limitmedia.pong.core.config.GameConfig;
 import net.limitmedia.pong.core.gameplay.PhysicsTuning;
+import net.limitmedia.pong.core.presentation.ThemeDefinition;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -21,18 +22,25 @@ public final class ClientAudioController implements Closeable {
 
     private final AudioMixer mixer;
     private final GameConfig.AudioSettings settings;
+    private final ThemeDefinition.AudioTheme audioTheme;
 
     private AudioNode ambience;
     private AudioNode bounce;
+    private AudioNode goal;
 
-    public ClientAudioController(AudioMixer mixer, GameConfig.AudioSettings settings) {
+    public ClientAudioController(AudioMixer mixer, GameConfig.AudioSettings settings, ThemeDefinition.AudioTheme audioTheme) {
         this.mixer = mixer;
         this.settings = settings;
+        this.audioTheme = audioTheme;
     }
 
     public void initialize(AssetManager assets, Node root) {
-        ambience = loadLoop(assets, root, "Sound/Effects/Footsteps.ogg", AudioMixer.Bus.MUSIC, 0.25f);
-        bounce = loadOneShot(assets, root, "Sound/Effects/Footsteps.ogg", AudioMixer.Bus.SFX);
+        String matchLoop = audioTheme != null ? audioTheme.matchLoop() : null;
+        String bounceSfx = audioTheme != null ? audioTheme.bounce() : null;
+        String goalSfx = audioTheme != null ? audioTheme.goal() : null;
+        ambience = loadLoop(assets, root, matchLoop, AudioMixer.Bus.MUSIC, 0.25f);
+        bounce = loadOneShot(assets, root, bounceSfx, AudioMixer.Bus.SFX);
+        goal = loadOneShot(assets, root, goalSfx, AudioMixer.Bus.SFX);
     }
 
     public void update(float tpf) {
@@ -63,8 +71,23 @@ public final class ClientAudioController implements Closeable {
         }
     }
 
+    public void playGoal() {
+        if (goal == null) {
+            return;
+        }
+        goal.setVolume(mixer.resolveGain(AudioMixer.Bus.SFX));
+        goal.playInstance();
+        mixer.setDuck(AudioMixer.Bus.MUSIC, Math.max(0.45f, 1f - settings.ducking()));
+        if (ambience != null) {
+            ambience.setVolume(mixer.resolveGain(AudioMixer.Bus.MUSIC) * 0.25f);
+        }
+    }
+
     private AudioNode loadLoop(AssetManager assets, Node root, String path, AudioMixer.Bus bus, float gain) {
         try {
+            if (path == null || path.isBlank()) {
+                return null;
+            }
             AudioNode node = new AudioNode(assets, path, false);
             node.setLooping(true);
             node.setPositional(false);
@@ -79,6 +102,9 @@ public final class ClientAudioController implements Closeable {
 
     private AudioNode loadOneShot(AssetManager assets, Node root, String path, AudioMixer.Bus bus) {
         try {
+            if (path == null || path.isBlank()) {
+                return null;
+            }
             AudioNode node = new AudioNode(assets, path, false);
             node.setLooping(false);
             node.setPositional(false);
@@ -99,6 +125,9 @@ public final class ClientAudioController implements Closeable {
         }
         if (bounce != null) {
             bounce.removeFromParent();
+        }
+        if (goal != null) {
+            goal.removeFromParent();
         }
     }
 }

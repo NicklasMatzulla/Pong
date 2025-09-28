@@ -36,6 +36,12 @@ accessibility:
   colorBlindMode: OFF
   uiScale: 1.0
   screenShake: 0.4
+presentation:
+  theme: neon
+  hudTheme: neon
+  enableBloom: true
+  enableMotionBlur: true
+  backgroundStyle: aurora
 locale:
   language: en
   country: US

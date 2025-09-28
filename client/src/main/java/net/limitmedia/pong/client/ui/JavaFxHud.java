@@ -19,6 +19,7 @@ import javafx.util.Duration;
 import java.util.concurrent.atomic.AtomicBoolean;
 import net.limitmedia.pong.core.audio.AudioMixer;
 import net.limitmedia.pong.core.localization.LocalizationService;
+import net.limitmedia.pong.core.presentation.ThemeDefinition;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -28,6 +29,7 @@ public final class JavaFxHud {
 
     private final LocalizationService localization;
     private final AudioMixer mixer;
+    private final ThemeDefinition.UiTheme uiTheme;
 
     private Stage stage;
     private BorderPane root;
@@ -37,9 +39,10 @@ public final class JavaFxHud {
     private Label statusLabel;
     private volatile float requestedScale = 1f;
 
-    public JavaFxHud(LocalizationService localization, AudioMixer mixer) {
+    public JavaFxHud(LocalizationService localization, AudioMixer mixer, ThemeDefinition.UiTheme uiTheme) {
         this.localization = localization;
         this.mixer = mixer;
+        this.uiTheme = uiTheme;
         ensureToolkit();
     }
 
@@ -185,11 +188,13 @@ public final class JavaFxHud {
         root.setCenter(mixerBox);
         root.setBottom(footer);
         root.setPrefSize(420, 260);
+        applyThemeStyling();
 
         StackPane container = new StackPane(root);
         container.getStyleClass().add("hud-stage");
         container.setScaleX(requestedScale);
         container.setScaleY(requestedScale);
+        applyContainerStyling(container);
 
         Scene scene = new Scene(container);
         var stylesheet = JavaFxHud.class.getResource("/ui/hud.css");
@@ -198,7 +203,41 @@ public final class JavaFxHud {
         } else {
             LOG.warn("Missing HUD stylesheet");
         }
+        if (uiTheme != null && uiTheme.stylesheet() != null) {
+            var themed = JavaFxHud.class.getResource("/" + uiTheme.stylesheet());
+            if (themed != null) {
+                scene.getStylesheets().add(themed.toExternalForm());
+            } else {
+                LOG.warn("HUD theme stylesheet {} not found", uiTheme.stylesheet());
+            }
+        }
         stage.setScene(scene);
+    }
+
+    private void applyThemeStyling() {
+        if (uiTheme == null) {
+            return;
+        }
+        StringBuilder style = new StringBuilder();
+        if (uiTheme.accentColor() != null && !uiTheme.accentColor().isBlank()) {
+            style.append("-fx-border-color: ").append(uiTheme.accentColor()).append(';');
+        }
+        if (uiTheme.fontFamily() != null && !uiTheme.fontFamily().isBlank()) {
+            style.append("-fx-font-family: '").append(uiTheme.fontFamily())
+                    .append("', 'Segoe UI', 'Roboto', sans-serif;");
+        }
+        if (!style.isEmpty()) {
+            root.setStyle(style.toString());
+        }
+    }
+
+    private void applyContainerStyling(StackPane container) {
+        if (uiTheme == null) {
+            return;
+        }
+        if (uiTheme.accentColor() != null && !uiTheme.accentColor().isBlank()) {
+            container.setStyle("-fx-hud-accent: " + uiTheme.accentColor() + ';');
+        }
     }
 
     private Label metricLabel(String text) {

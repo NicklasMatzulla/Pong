@@ -1,0 +1,23 @@
+.hud-stage {
+    -fx-hud-accent: #4cd3ff;
+    -fx-hud-glass-top: rgba(18, 26, 36, 0.94);
+    -fx-hud-glass-bottom: rgba(10, 14, 22, 0.88);
+}
+
+.hud-root {
+    -fx-effect: dropshadow(gaussian, rgba(76, 211, 255, 0.45), 48, 0.62, 0, 18);
+}
+
+.metric {
+    -fx-text-fill: linear-gradient(to right, #f8fdff, rgba(76, 211, 255, 0.92));
+}
+
+.button.primary {
+    -fx-background-color: linear-gradient(to bottom right, #4cd3ff, #366dff);
+    -fx-effect: dropshadow(gaussian, rgba(76, 211, 255, 0.45), 24, 0.4, 0, 6);
+}
+
+.button.danger {
+    -fx-background-color: linear-gradient(to bottom right, #ff6ad5, #ff4d97);
+    -fx-effect: dropshadow(gaussian, rgba(255, 106, 213, 0.45), 24, 0.4, 0, 6);
+}
