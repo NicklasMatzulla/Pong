@@ -12,6 +12,7 @@ import org.lwjgl.glfw.GLFWErrorCallback;
 import org.lwjgl.opengl.GL;
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.system.MemoryUtil;
+import org.lwjgl.system.Platform;
 
 public final class GameApplication implements Runnable {
     private static final int INITIAL_WIDTH = 1280;
@@ -125,17 +126,13 @@ public final class GameApplication implements Runnable {
             throw new IllegalStateException("Unable to initialize GLFW. Prüfe GPU-Treiber oder installiere die Desktop-Windowing-Komponenten.");
         }
 
-        GLFW.glfwDefaultWindowHints();
-        GLFW.glfwWindowHint(GLFW.GLFW_VISIBLE, GLFW.GLFW_FALSE);
-        GLFW.glfwWindowHint(GLFW.GLFW_RESIZABLE, GLFW.GLFW_TRUE);
-        GLFW.glfwWindowHint(GLFW.GLFW_CONTEXT_VERSION_MAJOR, 3);
-        GLFW.glfwWindowHint(GLFW.GLFW_CONTEXT_VERSION_MINOR, 3);
-        GLFW.glfwWindowHint(GLFW.GLFW_OPENGL_PROFILE, GLFW.GLFW_OPENGL_ANY_PROFILE);
-        GLFW.glfwWindowHint(GLFW.GLFW_DOUBLEBUFFER, GLFW.GLFW_TRUE);
-
-        window = GLFW.glfwCreateWindow(width, height, "Pong Velocity", 0, 0);
-        if (window == 0L) {
-            throw new IllegalStateException("Failed to create GLFW window");
+        window = createWindow(3, 3, true);
+        if (window == MemoryUtil.NULL) {
+            System.err.println("Konnte keinen OpenGL 3.3 Kontext erzeugen – weiche auf 2.1 Kompatibilitätsmodus aus.");
+            window = createWindow(2, 1, false);
+        }
+        if (window == MemoryUtil.NULL) {
+            throw new IllegalStateException("Failed to create GLFW window – OpenGL 2.1 Kontext nicht verfügbar.");
         }
 
         GLFW.glfwMakeContextCurrent(window);
@@ -143,6 +140,10 @@ public final class GameApplication implements Runnable {
         GLFW.glfwShowWindow(window);
 
         GL.createCapabilities();
+        if (!org.lwjgl.opengl.GL.getCapabilities().OpenGL20) {
+            throw new IllegalStateException("OpenGL 2.0 wird benötigt, aber nicht gefunden. Aktualisiere die Grafikkartentreiber.");
+        }
+        GL11.glViewport(0, 0, width, height);
 
         try {
             audioEngine = new AmbientAudioEngine();
@@ -165,6 +166,29 @@ public final class GameApplication implements Runnable {
         showMainMenu(null);
         running = true;
         lastTime = GLFW.glfwGetTime();
+    }
+
+    private long createWindow(int major, int minor, boolean requestCompatProfile) {
+        GLFW.glfwDefaultWindowHints();
+        GLFW.glfwWindowHint(GLFW.GLFW_VISIBLE, GLFW.GLFW_FALSE);
+        GLFW.glfwWindowHint(GLFW.GLFW_RESIZABLE, GLFW.GLFW_TRUE);
+        GLFW.glfwWindowHint(GLFW.GLFW_DOUBLEBUFFER, GLFW.GLFW_TRUE);
+        GLFW.glfwWindowHint(GLFW.GLFW_CONTEXT_VERSION_MAJOR, major);
+        GLFW.glfwWindowHint(GLFW.GLFW_CONTEXT_VERSION_MINOR, minor);
+        if (major >= 3 && requestCompatProfile) {
+            if (Platform.get() == Platform.MACOSX) {
+                GLFW.glfwWindowHint(GLFW.GLFW_OPENGL_PROFILE, GLFW.GLFW_OPENGL_CORE_PROFILE);
+                GLFW.glfwWindowHint(GLFW.GLFW_OPENGL_FORWARD_COMPAT, GLFW.GLFW_TRUE);
+            } else {
+                GLFW.glfwWindowHint(GLFW.GLFW_OPENGL_PROFILE, GLFW.GLFW_OPENGL_COMPAT_PROFILE);
+            }
+        } else {
+            GLFW.glfwWindowHint(GLFW.GLFW_OPENGL_PROFILE, GLFW.GLFW_OPENGL_ANY_PROFILE);
+            if (Platform.get() == Platform.MACOSX) {
+                GLFW.glfwWindowHint(GLFW.GLFW_OPENGL_FORWARD_COMPAT, GLFW.GLFW_TRUE);
+            }
+        }
+        return GLFW.glfwCreateWindow(width, height, "Pong Velocity", MemoryUtil.NULL, MemoryUtil.NULL);
     }
 
     private void loop() {
