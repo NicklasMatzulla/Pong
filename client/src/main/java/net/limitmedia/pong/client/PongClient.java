@@ -111,13 +111,14 @@ public final class PongClient extends SimpleApplication {
                     GameConfig.PresentationSettings.defaults(),
                     Locale.ENGLISH);
         }
+        loadTheme(config.presentation());
+
         arenaProfile = ArenaProfile.from(config.gameplay().arenaProfile());
         physicsTuning = config.gameplay().enableSpin()
                 ? toTuning(config.gameplay().physics())
                 : toTuning(config.gameplay().physics()).withoutSpin();
         arena = arenaProfile.dimensions();
         ballTrailEnabled = config.gameplay().ballTrail() && theme.effects().trailFade() > 0.05f;
-        loadTheme(config.presentation());
         screenShakeScale = config.accessibility().screenShake() * theme.effects().shakeMultiplier();
         aiController = buildAiController(config.gameplay());
         mixer.setVolume(AudioMixer.Bus.MASTER, config.audio().master());

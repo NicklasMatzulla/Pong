@@ -33,7 +33,7 @@ gameplay:
     maxSpeed: 42.0
     paddleControl: 0.55
 accessibility:
-  colorBlindMode: OFF
+  colorBlindMode: 'OFF'
   uiScale: 1.0
   screenShake: 0.4
 presentation:
@@ -42,6 +42,4 @@ presentation:
   enableBloom: true
   enableMotionBlur: true
   backgroundStyle: aurora
-locale:
-  language: en
-  country: US
+locale: en-US
