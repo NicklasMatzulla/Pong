@@ -1,26 +1,47 @@
-plugins { id 'application' }
+plugins {
+    id 'application'
+}
 
-repositories { mavenCentral() }
+repositories {
+    mavenCentral()
+}
+
+ext {
+    lwjglVersion = '3.3.3'
+    lwjglNatives = null
+    def osName = System.getProperty('os.name').toLowerCase()
+    if (osName.contains('mac')) {
+        lwjglNatives = "natives-macos"
+    } else if (osName.contains('win')) {
+        lwjglNatives = "natives-windows"
+    } else {
+        lwjglNatives = "natives-linux"
+    }
+}
 
 dependencies {
-  implementation 'org.jmonkeyengine:jme3-core:3.6.1-stable'
-  implementation 'org.jmonkeyengine:jme3-desktop:3.6.1-stable'
-  implementation 'org.jmonkeyengine:jme3-effects:3.6.1-stable'
-  implementation 'org.jmonkeyengine:jme3-lwjgl3:3.6.1-stable'
-  implementation 'org.jmonkeyengine:jme3-plugins:3.6.1-stable'
-  implementation 'org.jmonkeyengine:jme3-jogg:3.6.1-stable'
-  implementation 'org.jmonkeyengine:jme3-networking:3.6.1-stable'
-  implementation 'org.jmonkeyengine:jme3-jbullet:3.6.1-stable'
-  implementation 'org.jmonkeyengine:jme3-terrain:3.6.1-stable'
+    implementation platform("org.lwjgl:lwjgl-bom:${lwjglVersion}")
+    implementation 'org.lwjgl:lwjgl'
+    implementation 'org.lwjgl:lwjgl-glfw'
+    implementation 'org.lwjgl:lwjgl-openal'
+    implementation 'org.lwjgl:lwjgl-opengl'
+    implementation 'org.lwjgl:lwjgl-stb'
+    implementation 'org.lwjgl:lwjgl-nanovg'
+
+    runtimeOnly "org.lwjgl:lwjgl::${lwjglNatives}"
+    runtimeOnly "org.lwjgl:lwjgl-glfw::${lwjglNatives}"
+    runtimeOnly "org.lwjgl:lwjgl-openal::${lwjglNatives}"
+    runtimeOnly "org.lwjgl:lwjgl-opengl::${lwjglNatives}"
+    runtimeOnly "org.lwjgl:lwjgl-stb::${lwjglNatives}"
+    runtimeOnly "org.lwjgl:lwjgl-nanovg::${lwjglNatives}"
 }
 
 application {
-  mainClass = 'net.limitmedia.pong3d.Main'
-  applicationDefaultJvmArgs = ['--enable-native-access=ALL-UNNAMED']
+    mainClass = 'net.limitmedia.pong3d.Main'
 }
 
 tasks.withType(JavaCompile).configureEach {
-  options.encoding = 'UTF-8'
-  sourceCompatibility = '17'
-  targetCompatibility = '17'
+    options.encoding = 'UTF-8'
+    sourceCompatibility = '17'
+    targetCompatibility = '17'
 }
