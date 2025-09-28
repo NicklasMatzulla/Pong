@@ -8,6 +8,7 @@ import net.limitmedia.pong3d.engine.Screen;
 import net.limitmedia.pong3d.ui.SpringUiTheme;
 import net.limitmedia.pong3d.ui.UiColor;
 import org.lwjgl.glfw.GLFW;
+import org.lwjgl.opengl.GL11;
 
 public final class MainMenuScreen implements Screen {
     private final GameApplication app;
@@ -104,6 +105,15 @@ public final class MainMenuScreen implements Screen {
         int height = app.getHeight();
         float glow = 0.45f + 0.25f * (float) Math.sin(time * 0.7f);
 
+        GL11.glDisable(GL11.GL_DEPTH_TEST);
+        GL11.glMatrixMode(GL11.GL_PROJECTION);
+        GL11.glPushMatrix();
+        GL11.glLoadIdentity();
+        GL11.glOrtho(0.0, width, height, 0.0, -1.0, 1.0);
+        GL11.glMatrixMode(GL11.GL_MODELVIEW);
+        GL11.glPushMatrix();
+        GL11.glLoadIdentity();
+
         fillRect(0f, 0f, width, height, SpringUiTheme.CANVAS);
         fillRect(0f, 0f, width, height, withAlpha(SpringUiTheme.CANVAS_GLOW, 0.58f));
         for (int i = 0; i < 7; i++) {
@@ -134,10 +144,14 @@ public final class MainMenuScreen implements Screen {
         float haloRadius = 90f + 18f * (float) Math.sin(time * 0.66f);
         fillCircle(cardX + cardWidth - 140f, cardY + 126f, haloRadius, withAlpha(SpringUiTheme.ORB_SECONDARY, 0.42f));
 
-        Draw.text("PONG VELOCITY", cardX + 48f, cardY + 80f, 3.1f, SpringUiTheme.TEXT_PRIMARY.r(), SpringUiTheme.TEXT_PRIMARY.g(), SpringUiTheme.TEXT_PRIMARY.b(), 1f);
-        Draw.text("Modernes LWJGL Erlebnis mit federnder Spring-Ästhetik", cardX + 48f, cardY + 140f, 1.6f, SpringUiTheme.TEXT_SECONDARY.r(), SpringUiTheme.TEXT_SECONDARY.g(), SpringUiTheme.TEXT_SECONDARY.b(), SpringUiTheme.TEXT_SECONDARY.a());
-        Draw.text("Steuere das Paddle mit A/D oder den Pfeiltasten. Enter startet sofort.", cardX + 48f, cardY + 188f, 1.35f, SpringUiTheme.TEXT_MUTED.r(), SpringUiTheme.TEXT_MUTED.g(), SpringUiTheme.TEXT_MUTED.b(), SpringUiTheme.TEXT_MUTED.a());
-        Draw.text("Weiche Bounces, dezentes Camera-Shake und dynamische Multiplayer-Queues warten.", cardX + 48f, cardY + 226f, 1.28f, SpringUiTheme.TEXT_MUTED.r(), SpringUiTheme.TEXT_MUTED.g(), SpringUiTheme.TEXT_MUTED.b(), 0.78f);
+        Draw.text("PONG VELOCITY 3D", cardX + 48f, cardY + 80f, 3.2f,
+                SpringUiTheme.TEXT_PRIMARY.r(), SpringUiTheme.TEXT_PRIMARY.g(), SpringUiTheme.TEXT_PRIMARY.b(), 1f);
+        Draw.text("Geflutet mit Vaadin-Tiefen, volumetrischem Licht und einer reaktiven 3D-Arena", cardX + 48f, cardY + 140f, 1.6f,
+                SpringUiTheme.TEXT_SECONDARY.r(), SpringUiTheme.TEXT_SECONDARY.g(), SpringUiTheme.TEXT_SECONDARY.b(), SpringUiTheme.TEXT_SECONDARY.a());
+        Draw.text("Steuere das Paddle mit A/D oder den Pfeiltasten. Enter startet die holografische Arena.", cardX + 48f, cardY + 188f,
+                1.35f, SpringUiTheme.TEXT_MUTED.r(), SpringUiTheme.TEXT_MUTED.g(), SpringUiTheme.TEXT_MUTED.b(), SpringUiTheme.TEXT_MUTED.a());
+        Draw.text("Synchrone Multiplayer-Matches, geschmeidige Rebounds und kamerageführte Lichtspiele warten auf dich.", cardX + 48f,
+                cardY + 226f, 1.28f, SpringUiTheme.TEXT_MUTED.r(), SpringUiTheme.TEXT_MUTED.g(), SpringUiTheme.TEXT_MUTED.b(), 0.78f);
 
         for (int i = 0; i < buttons.length; i++) {
             renderButton(buttons[i], i == selectedIndex, glow);
@@ -153,6 +167,12 @@ public final class MainMenuScreen implements Screen {
         if (joinDialog.isVisible()) {
             joinDialog.render(width, height);
         }
+
+        GL11.glMatrixMode(GL11.GL_MODELVIEW);
+        GL11.glPopMatrix();
+        GL11.glMatrixMode(GL11.GL_PROJECTION);
+        GL11.glPopMatrix();
+        GL11.glMatrixMode(GL11.GL_MODELVIEW);
     }
     private void renderButton(MenuButton button, boolean selected, float glow) {
         float pulse = selected ? (0.65f + 0.35f * (float) Math.sin(time * 3.2f)) : 0.32f;
