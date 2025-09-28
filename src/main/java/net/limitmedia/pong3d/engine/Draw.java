@@ -33,15 +33,28 @@ public final class Draw {
         GL11.glEnd();
     }
 
+    private static final ThreadLocal<ByteBuffer> TEXT_BUFFER = ThreadLocal.withInitial(() -> BufferUtils.createByteBuffer(16 * 1024));
+
     public static void text(String text, float x, float y, float scale, float r, float g, float b, float a) {
         if (text == null || text.isEmpty()) {
             return;
         }
-        ByteBuffer buffer = BufferUtils.createByteBuffer(16 * text.length());
+
+        int requiredCapacity = Math.max(1, text.length()) * 270;
+        ByteBuffer buffer = TEXT_BUFFER.get();
+        if (buffer.capacity() < requiredCapacity) {
+            buffer = BufferUtils.createByteBuffer(Integer.highestOneBit(requiredCapacity - 1) << 1);
+            TEXT_BUFFER.set(buffer);
+        }
+
+        buffer.clear();
+        int quads = STBEasyFont.stb_easy_font_print(0, 0, text, null, buffer);
+        buffer.limit(quads * 4 * 16);
+        buffer.position(0);
+
         GL11.glPushMatrix();
         GL11.glTranslatef(x, y, 0f);
         GL11.glScalef(scale, scale, 1f);
-        int quads = STBEasyFont.stb_easy_font_print(0, 0, text, null, buffer);
         GL11.glColor4f(r, g, b, a);
         GL11.glEnableClientState(GL11.GL_VERTEX_ARRAY);
         GL11.glVertexPointer(2, GL11.GL_FLOAT, 16, buffer);

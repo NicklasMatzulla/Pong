@@ -119,6 +119,11 @@ public final class GameApplication implements Runnable {
             lastTime = now;
 
             input.beginFrame();
+            GLFW.glfwPollEvents();
+
+            if (audioEngine != null) {
+                audioEngine.update();
+            }
 
             if (currentScreen != null) {
                 currentScreen.update(delta);
@@ -138,7 +143,6 @@ public final class GameApplication implements Runnable {
             }
 
             GLFW.glfwSwapBuffers(window);
-            GLFW.glfwPollEvents();
         }
     }
 
