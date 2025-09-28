@@ -11,6 +11,7 @@ import org.lwjgl.glfw.GLFW;
 import org.lwjgl.glfw.GLFWErrorCallback;
 import org.lwjgl.opengl.GL;
 import org.lwjgl.opengl.GL11;
+import org.lwjgl.system.MemoryUtil;
 
 public final class GameApplication implements Runnable {
     private static final int INITIAL_WIDTH = 1280;
@@ -28,6 +29,7 @@ public final class GameApplication implements Runnable {
     private NetworkServer hostedServer;
 
     private double lastTime;
+    private GLFWErrorCallback errorCallback;
 
     public void run() {
         init();
@@ -60,6 +62,9 @@ public final class GameApplication implements Runnable {
 
     public void requestExit() {
         running = false;
+        if (window != MemoryUtil.NULL) {
+            GLFW.glfwSetWindowShouldClose(window, true);
+        }
     }
 
     public void startNetworkHost() {
@@ -111,9 +116,13 @@ public final class GameApplication implements Runnable {
 
     private void init() {
         System.out.println("Starting LWJGL " + Version.getVersion());
-        GLFWErrorCallback.createPrint(System.err).set();
+        errorCallback = GLFWErrorCallback.create((error, description) -> {
+            String message = GLFWErrorCallback.getDescription(description);
+            System.err.println("[GLFW] error " + error + ": " + message);
+        });
+        errorCallback.set();
         if (!GLFW.glfwInit()) {
-            throw new IllegalStateException("Unable to initialize GLFW");
+            throw new IllegalStateException("Unable to initialize GLFW. Prüfe GPU-Treiber oder installiere die Desktop-Windowing-Komponenten.");
         }
 
         GLFW.glfwDefaultWindowHints();
@@ -122,6 +131,7 @@ public final class GameApplication implements Runnable {
         GLFW.glfwWindowHint(GLFW.GLFW_CONTEXT_VERSION_MAJOR, 3);
         GLFW.glfwWindowHint(GLFW.GLFW_CONTEXT_VERSION_MINOR, 3);
         GLFW.glfwWindowHint(GLFW.GLFW_OPENGL_PROFILE, GLFW.GLFW_OPENGL_ANY_PROFILE);
+        GLFW.glfwWindowHint(GLFW.GLFW_DOUBLEBUFFER, GLFW.GLFW_TRUE);
 
         window = GLFW.glfwCreateWindow(width, height, "Pong Velocity", 0, 0);
         if (window == 0L) {
@@ -134,7 +144,12 @@ public final class GameApplication implements Runnable {
 
         GL.createCapabilities();
 
-        audioEngine = new AmbientAudioEngine();
+        try {
+            audioEngine = new AmbientAudioEngine();
+        } catch (RuntimeException | UnsatisfiedLinkError ex) {
+            System.err.println("Audio initialisation failed – continuing ohne Sound: " + ex.getMessage());
+            audioEngine = null;
+        }
 
         input.register(window);
         GLFW.glfwSetFramebufferSizeCallback(window, (w, newWidth, newHeight) -> {
@@ -156,6 +171,9 @@ public final class GameApplication implements Runnable {
         while (running && !GLFW.glfwWindowShouldClose(window)) {
             double now = GLFW.glfwGetTime();
             float delta = (float) (now - lastTime);
+            if (delta > 0.12f) {
+                delta = 0.12f;
+            }
             lastTime = now;
 
             input.beginFrame();
@@ -199,6 +217,9 @@ public final class GameApplication implements Runnable {
         Callbacks.glfwFreeCallbacks(window);
         GLFW.glfwDestroyWindow(window);
         GLFW.glfwTerminate();
-        GLFW.glfwSetErrorCallback(null).free();
+        if (errorCallback != null) {
+            errorCallback.free();
+            errorCallback = null;
+        }
     }
 }

@@ -5,6 +5,8 @@ import net.limitmedia.pong3d.engine.Draw;
 import net.limitmedia.pong3d.engine.GameApplication;
 import net.limitmedia.pong3d.engine.Input;
 import net.limitmedia.pong3d.engine.Screen;
+import net.limitmedia.pong3d.ui.SpringUiTheme;
+import net.limitmedia.pong3d.ui.UiColor;
 import org.lwjgl.glfw.GLFW;
 
 public final class MainMenuScreen implements Screen {
@@ -100,64 +102,92 @@ public final class MainMenuScreen implements Screen {
     public void render() {
         int width = app.getWidth();
         int height = app.getHeight();
-        float glow = 0.4f + 0.2f * (float) Math.sin(time * 0.8f);
+        float glow = 0.45f + 0.25f * (float) Math.sin(time * 0.7f);
 
-        Draw.rect(0, 0, width, height, 0.03f, 0.04f, 0.06f, 1f);
-        Draw.rect(0, 0, width, height, 0.06f, 0.07f, 0.12f, 0.55f);
+        fillRect(0f, 0f, width, height, SpringUiTheme.CANVAS);
+        fillRect(0f, 0f, width, height, withAlpha(SpringUiTheme.CANVAS_GLOW, 0.58f));
         for (int i = 0; i < 7; i++) {
-            float bandHeight = height / 10f;
-            float y = i * bandHeight * 0.9f + (float) Math.sin(time * 0.3f + i) * 18f;
-            float alpha = 0.06f + i * 0.04f;
-            Draw.rect(0, y, width, bandHeight, 0.08f + glow * 0.1f + i * 0.02f, 0.12f + glow * 0.2f + i * 0.025f, 0.18f + glow * 0.3f + i * 0.03f, alpha);
+            float bandHeight = height / 9.5f;
+            float offset = (float) Math.sin(time * 0.32f + i * 0.75f) * 26f;
+            float y = i * bandHeight * 0.88f + offset;
+            float alpha = 0.06f + i * 0.035f;
+            float r = 0.08f + glow * 0.1f + i * 0.015f;
+            float g = 0.12f + glow * 0.18f + i * 0.02f;
+            float b = 0.18f + glow * 0.24f + i * 0.024f;
+            Draw.rect(0f, y, width, bandHeight, r, g, b, alpha);
         }
 
-        float orbRadius = 220f + 40f * (float) Math.sin(time * 0.5f);
-        float orbX = width * 0.25f + (float) Math.sin(time * 0.35f) * 120f;
-        float orbY = height * 0.32f + (float) Math.cos(time * 0.28f) * 70f;
-        Draw.circle(orbX, orbY, orbRadius, 0.18f, 0.45f, 0.75f, 0.32f, 64);
-        Draw.circle(width - orbX, height - orbY, orbRadius * 0.7f, 0.3f, 0.6f, 0.95f, 0.26f, 64);
+        float orbRadius = 220f + 36f * (float) Math.sin(time * 0.54f);
+        float orbX = width * 0.24f + (float) Math.sin(time * 0.33f) * 140f;
+        float orbY = height * 0.3f + (float) Math.cos(time * 0.27f) * 90f;
+        fillCircle(orbX, orbY, orbRadius, withAlpha(SpringUiTheme.ORB_PRIMARY, 0.32f));
+        fillCircle(width - orbX, height - orbY, orbRadius * 0.72f, withAlpha(SpringUiTheme.ORB_SECONDARY, 0.24f));
 
-        float cardWidth = Math.min(width * 0.68f, 860f);
+        float cardWidth = Math.min(width * 0.7f, 860f);
         float cardHeight = Math.min(height * 0.52f, 520f);
         float cardX = (width - cardWidth) * 0.5f;
         float cardY = height * 0.16f;
-        Draw.rect(cardX, cardY, cardWidth, cardHeight, 0.11f, 0.14f, 0.18f, 0.88f);
-        Draw.rect(cardX, cardY, cardWidth, 6f, 0.35f, 0.62f, 0.95f, 1f);
-        Draw.rect(cardX + 26f, cardY + 90f, cardWidth - 52f, cardHeight - 140f, 0.09f, 0.11f, 0.15f, 0.92f);
-        Draw.circle(cardX + cardWidth - 140f, cardY + 120f, 90f + 20f * (float) Math.sin(time * 0.7f), 0.22f, 0.46f, 0.75f, 0.4f, 48);
+        fillRect(cardX - 18f, cardY - 18f, cardWidth + 36f, cardHeight + 36f, withAlpha(SpringUiTheme.BUTTON_OUTLINE, 0.6f));
+        fillRect(cardX, cardY, cardWidth, cardHeight, SpringUiTheme.CARD);
+        fillRect(cardX, cardY, cardWidth, 6f, SpringUiTheme.CARD_ACCENT);
+        fillRect(cardX + 26f, cardY + 94f, cardWidth - 52f, cardHeight - 148f, withAlpha(SpringUiTheme.CANVAS_GLOW, 0.92f));
+        float haloRadius = 90f + 18f * (float) Math.sin(time * 0.66f);
+        fillCircle(cardX + cardWidth - 140f, cardY + 126f, haloRadius, withAlpha(SpringUiTheme.ORB_SECONDARY, 0.42f));
 
-        Draw.text("PONG VELOCITY", cardX + 48f, cardY + 80f, 3.1f, 0.82f, 0.9f, 1f, 1f);
-        Draw.text("Modernes LWJGL Erlebnis mit Vaadin-inspirierter Eleganz", cardX + 48f, cardY + 140f, 1.6f, 0.75f, 0.85f, 1f, 0.92f);
-        Draw.text("Bewege das Paddle mit A/D oder den Pfeiltasten. Enter oder Space startet.", cardX + 48f, cardY + 188f, 1.4f, 0.65f, 0.75f, 0.9f, 0.82f);
-        Draw.text("Satte Audioeffekte, sanfte Kamerafahrten und ein futuristisches Stadion erwarten dich.", cardX + 48f, cardY + 226f, 1.3f, 0.6f, 0.72f, 0.92f, 0.78f);
+        Draw.text("PONG VELOCITY", cardX + 48f, cardY + 80f, 3.1f, SpringUiTheme.TEXT_PRIMARY.r(), SpringUiTheme.TEXT_PRIMARY.g(), SpringUiTheme.TEXT_PRIMARY.b(), 1f);
+        Draw.text("Modernes LWJGL Erlebnis mit federnder Spring-Ästhetik", cardX + 48f, cardY + 140f, 1.6f, SpringUiTheme.TEXT_SECONDARY.r(), SpringUiTheme.TEXT_SECONDARY.g(), SpringUiTheme.TEXT_SECONDARY.b(), SpringUiTheme.TEXT_SECONDARY.a());
+        Draw.text("Steuere das Paddle mit A/D oder den Pfeiltasten. Enter startet sofort.", cardX + 48f, cardY + 188f, 1.35f, SpringUiTheme.TEXT_MUTED.r(), SpringUiTheme.TEXT_MUTED.g(), SpringUiTheme.TEXT_MUTED.b(), SpringUiTheme.TEXT_MUTED.a());
+        Draw.text("Weiche Bounces, dezentes Camera-Shake und dynamische Multiplayer-Queues warten.", cardX + 48f, cardY + 226f, 1.28f, SpringUiTheme.TEXT_MUTED.r(), SpringUiTheme.TEXT_MUTED.g(), SpringUiTheme.TEXT_MUTED.b(), 0.78f);
 
         for (int i = 0; i < buttons.length; i++) {
             renderButton(buttons[i], i == selectedIndex, glow);
         }
 
-        Draw.text("LWJGL 3 • 144Hz bereit • Keine Fullscreen-Pflicht", width * 0.5f - 220f, height - 60f, 1.2f, 0.62f, 0.76f, 0.92f, 0.75f);
+        Draw.text("LWJGL 3 • Frame pacing stabilisiert • Keine Fullscreen-Pflicht", width * 0.5f - 250f, height - 60f, 1.2f, SpringUiTheme.TEXT_MUTED.r(), SpringUiTheme.TEXT_MUTED.g(), SpringUiTheme.TEXT_MUTED.b(), 0.76f);
         if (statusMessage != null && !statusMessage.isEmpty()) {
             float statusX = width * 0.5f - Math.min(320f, statusMessage.length() * 7.2f);
-            Draw.text(statusMessage, statusX, height - 92f, 1.25f, 0.88f, 0.94f, 1f, 0.88f);
+            Draw.text(statusMessage, statusX, height - 92f, 1.25f, SpringUiTheme.TEXT_PRIMARY.r(), SpringUiTheme.TEXT_PRIMARY.g(), SpringUiTheme.TEXT_PRIMARY.b(), 0.88f);
         }
-        Draw.text("Limit Media Labs 2025", width * 0.5f - 120f, height - 32f, 1.1f, 0.52f, 0.64f, 0.82f, 0.65f);
+        Draw.text("Limit Media Labs 2025", width * 0.5f - 120f, height - 32f, 1.1f, SpringUiTheme.TEXT_MUTED.r(), SpringUiTheme.TEXT_MUTED.g(), SpringUiTheme.TEXT_MUTED.b(), 0.62f);
 
         if (joinDialog.isVisible()) {
             joinDialog.render(width, height);
         }
     }
-
     private void renderButton(MenuButton button, boolean selected, float glow) {
-        float accent = selected ? (0.6f + 0.4f * (float) Math.sin(time * 3f)) : 0.35f;
-        float baseAlpha = selected ? 0.92f : 0.75f;
-        Draw.rect(button.x - 6f, button.y - 6f, button.width + 12f, button.height + 12f, 0.08f, 0.1f, 0.14f, baseAlpha * 0.5f);
+        float pulse = selected ? (0.65f + 0.35f * (float) Math.sin(time * 3.2f)) : 0.32f;
+        UiColor base = selected ? SpringUiTheme.BUTTON_SELECTED : SpringUiTheme.BUTTON_IDLE;
+        float alpha = selected ? 0.94f : 0.78f;
+        fillRect(button.x - 8f, button.y - 8f, button.width + 16f, button.height + 16f, withAlpha(SpringUiTheme.BUTTON_OUTLINE, alpha * 0.45f));
         Draw.rect(button.x, button.y, button.width, button.height,
-                0.14f + accent * 0.25f,
-                0.28f + accent * 0.3f,
-                0.46f + accent * 0.28f,
-                baseAlpha);
-        Draw.text(button.label, button.x + 30f, button.y + button.height / 2f + 6f, 2.0f, 0.92f, 0.96f, 1f, 1f);
-        Draw.text(button.description, button.x + 30f, button.y + button.height / 2f + 34f, 1.2f, 0.75f, 0.85f, 1f, selected ? 0.9f : 0.75f);
+                clamp(base.r() + glow * 0.05f + pulse * 0.08f),
+                clamp(base.g() + glow * 0.08f + pulse * 0.1f),
+                clamp(base.b() + glow * 0.12f + pulse * 0.12f),
+                alpha);
+        Draw.text(button.label, button.x + 30f, button.y + button.height / 2f + 6f, 2.0f, SpringUiTheme.TEXT_PRIMARY.r(), SpringUiTheme.TEXT_PRIMARY.g(), SpringUiTheme.TEXT_PRIMARY.b(), 1f);
+        float descAlpha = selected ? 0.9f : 0.76f;
+        Draw.text(button.description, button.x + 30f, button.y + button.height / 2f + 34f, 1.2f, SpringUiTheme.TEXT_SECONDARY.r(), SpringUiTheme.TEXT_SECONDARY.g(), SpringUiTheme.TEXT_SECONDARY.b(), descAlpha);
+    }
+    private static void fillRect(float x, float y, float width, float height, UiColor color) {
+        Draw.rect(x, y, width, height, color.r(), color.g(), color.b(), color.a());
+    }
+
+    private static void fillCircle(float x, float y, float radius, UiColor color) {
+        Draw.circle(x, y, radius, color.r(), color.g(), color.b(), color.a(), 64);
+    }
+
+    private static UiColor withAlpha(UiColor color, float alpha) {
+        return color.withAlpha(alpha);
+    }
+
+    private static float clamp(float value) {
+        if (value < 0f) {
+            return 0f;
+        }
+        if (value > 1f) {
+            return 1f;
+        }
+        return value;
     }
 
     private final class JoinDialog {
@@ -217,27 +247,25 @@ public final class MainMenuScreen implements Screen {
             float x = (width - overlayWidth) * 0.5f;
             float y = height * 0.28f;
 
-            Draw.rect(0, 0, width, height, 0.02f, 0.03f, 0.05f, 0.68f);
-            Draw.rect(x, y, overlayWidth, overlayHeight, 0.1f, 0.12f, 0.18f, 0.95f);
-            Draw.rect(x, y, overlayWidth, 6f, 0.32f, 0.62f, 0.92f, 1f);
-            Draw.text("Serveradresse", x + 36f, y + 66f, 1.9f, 0.92f, 0.96f, 1f, 1f);
-            Draw.text("Bestätige mit Enter. Mit ESC schließt du das Feld.", x + 36f, y + 104f, 1.2f, 0.72f, 0.82f, 0.95f, 0.86f);
+            fillRect(0f, 0f, width, height, withAlpha(SpringUiTheme.CANVAS, 0.72f));
+            fillRect(x - 12f, y - 12f, overlayWidth + 24f, overlayHeight + 24f, withAlpha(SpringUiTheme.BUTTON_OUTLINE, 0.7f));
+            fillRect(x, y, overlayWidth, overlayHeight, SpringUiTheme.CARD);
+            fillRect(x, y, overlayWidth, 4f, SpringUiTheme.CARD_ACCENT);
+            Draw.text("Serveradresse", x + 36f, y + 66f, 1.9f, SpringUiTheme.TEXT_PRIMARY.r(), SpringUiTheme.TEXT_PRIMARY.g(), SpringUiTheme.TEXT_PRIMARY.b(), 1f);
+            Draw.text("Bestätige mit Enter. Mit ESC schließt du das Feld.", x + 36f, y + 104f, 1.2f, SpringUiTheme.TEXT_SECONDARY.r(), SpringUiTheme.TEXT_SECONDARY.g(), SpringUiTheme.TEXT_SECONDARY.b(), SpringUiTheme.TEXT_SECONDARY.a());
 
             float fieldX = x + 32f;
             float fieldY = y + 126f;
             float fieldWidth = overlayWidth - 64f;
             float fieldHeight = 68f;
-            Draw.rect(fieldX, fieldY, fieldWidth, fieldHeight, 0.07f, 0.09f, 0.15f, 0.96f);
-            Draw.rect(fieldX, fieldY, fieldWidth, 2f, 0.32f, 0.62f, 0.92f, 1f);
-            String text = host.toString();
-            if (text.isEmpty()) {
-                text = "127.0.0.1";
-            }
+            fillRect(fieldX - 4f, fieldY - 4f, fieldWidth + 8f, fieldHeight + 8f, withAlpha(SpringUiTheme.BUTTON_OUTLINE, 0.6f));
+            fillRect(fieldX, fieldY, fieldWidth, fieldHeight, withAlpha(SpringUiTheme.CANVAS_GLOW, 0.96f));
+            fillRect(fieldX, fieldY, fieldWidth, 2f, SpringUiTheme.CARD_ACCENT);
+            String textValue = host.length() == 0 ? "127.0.0.1" : host.toString();
             boolean caret = ((int) (pulse * 2f)) % 2 == 0;
-            String display = caret ? text + "_" : text + " ";
-            Draw.text(display, fieldX + 16f, fieldY + 46f, 1.6f, 0.88f, 0.94f, 1f, 1f);
+            String display = caret ? textValue + "_" : textValue + " ";
+            Draw.text(display, fieldX + 16f, fieldY + 46f, 1.6f, SpringUiTheme.TEXT_PRIMARY.r(), SpringUiTheme.TEXT_PRIMARY.g(), SpringUiTheme.TEXT_PRIMARY.b(), 1f);
         }
-
         boolean isVisible() {
             return visible;
         }

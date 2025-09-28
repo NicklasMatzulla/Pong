@@ -6,12 +6,14 @@ import org.lwjgl.glfw.GLFWCursorPosCallbackI;
 import org.lwjgl.glfw.GLFWKeyCallbackI;
 import org.lwjgl.glfw.GLFWMouseButtonCallbackI;
 
-import java.util.Arrays;
-
 public final class Input {
-    private final boolean[] keys = new boolean[GLFW.GLFW_KEY_LAST + 1];
-    private final boolean[] pressed = new boolean[GLFW.GLFW_KEY_LAST + 1];
-    private final boolean[] released = new boolean[GLFW.GLFW_KEY_LAST + 1];
+    private static final int KEY_COUNT = GLFW.GLFW_KEY_LAST + 1;
+
+    private final boolean[] keys = new boolean[KEY_COUNT];
+    private final boolean[] pressed = new boolean[KEY_COUNT];
+    private final boolean[] released = new boolean[KEY_COUNT];
+    private final int[] dirtyKeys = new int[KEY_COUNT];
+    private int dirtyCount;
 
     private double mouseX;
     private double mouseY;
@@ -27,8 +29,12 @@ public final class Input {
     }
 
     public void beginFrame() {
-        Arrays.fill(pressed, false);
-        Arrays.fill(released, false);
+        for (int i = 0; i < dirtyCount; i++) {
+            int key = dirtyKeys[i];
+            pressed[key] = false;
+            released[key] = false;
+        }
+        dirtyCount = 0;
         mouseClicked = false;
         typedChars.setLength(0);
     }
@@ -68,15 +74,17 @@ public final class Input {
     }
 
     private final GLFWKeyCallbackI keyCallback = (window, key, scancode, action, mods) -> {
-        if (key < 0 || key >= keys.length) {
+        if (key < 0 || key >= KEY_COUNT) {
             return;
         }
         if (action == GLFW.GLFW_PRESS) {
             keys[key] = true;
             pressed[key] = true;
+            markDirty(key);
         } else if (action == GLFW.GLFW_RELEASE) {
             keys[key] = false;
             released[key] = true;
+            markDirty(key);
         }
     };
 
@@ -106,4 +114,13 @@ public final class Input {
         }
         typedChars.appendCodePoint((int) codepoint);
     };
+
+    private void markDirty(int key) {
+        for (int i = 0; i < dirtyCount; i++) {
+            if (dirtyKeys[i] == key) {
+                return;
+            }
+        }
+        dirtyKeys[dirtyCount++] = key;
+    }
 }
