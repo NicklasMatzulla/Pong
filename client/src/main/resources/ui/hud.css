@@ -1,0 +1,30 @@
+.hud-root {
+    -fx-background-color: rgba(10, 14, 22, 0.85);
+    -fx-padding: 16px;
+    -fx-background-radius: 18px;
+    -fx-effect: dropshadow(gaussian, rgba(0, 150, 255, 0.35), 24, 0.6, 0, 4);
+    -fx-text-fill: #e6f0ff;
+    -fx-font-size: 16px;
+    -fx-font-family: "Segoe UI", "Roboto", sans-serif;
+}
+.label {
+    -fx-text-fill: #f4f7ff;
+}
+.button.danger {
+    -fx-background-color: linear-gradient(to bottom right, #ff4f6d, #e62350);
+    -fx-text-fill: white;
+    -fx-background-radius: 14px;
+    -fx-padding: 8px 18px;
+    -fx-font-weight: bold;
+}
+.button.danger:hover {
+    -fx-background-color: linear-gradient(to bottom right, #ff7486, #ff4164);
+}
+.slider .track {
+    -fx-background-color: rgba(255, 255, 255, 0.2);
+    -fx-background-radius: 12px;
+}
+.slider .thumb {
+    -fx-background-color: linear-gradient(to bottom right, #29d4ff, #0f89ff);
+    -fx-background-radius: 50%;
+}

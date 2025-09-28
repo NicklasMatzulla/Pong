@@ -1,0 +1,28 @@
+video:
+  width: 1920
+  height: 1080
+  fullscreen: false
+  vsync: true
+  fpsCap: 144
+  postProcessing: true
+  shadowQuality: HIGH
+  antialiasing: MSAA4X
+audio:
+  master: 0.9
+  music: 0.6
+  sfx: 0.8
+  ui: 0.7
+  ducking: 0.5
+gameplay:
+  botDifficulty: MEDIUM
+  enableSpin: true
+  powerUps: true
+  maxScore: 11
+  tickRate: 120
+accessibility:
+  colorBlindMode: OFF
+  uiScale: 1.0
+  screenShake: 0.4
+locale:
+  language: en
+  country: US
