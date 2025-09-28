@@ -1,30 +1,86 @@
+.hud-stage {
+    -fx-background-color: transparent;
+    -fx-padding: 32px;
+}
+
 .hud-root {
-    -fx-background-color: rgba(10, 14, 22, 0.85);
-    -fx-padding: 16px;
-    -fx-background-radius: 18px;
-    -fx-effect: dropshadow(gaussian, rgba(0, 150, 255, 0.35), 24, 0.6, 0, 4);
-    -fx-text-fill: #e6f0ff;
-    -fx-font-size: 16px;
-    -fx-font-family: "Segoe UI", "Roboto", sans-serif;
+    -fx-background-color: linear-gradient(to bottom right, rgba(22, 30, 42, 0.92), rgba(16, 24, 34, 0.88));
+    -fx-background-radius: 24px;
+    -fx-border-radius: 24px;
+    -fx-border-color: rgba(80, 160, 255, 0.45);
+    -fx-border-width: 1.5px;
+    -fx-effect: dropshadow(gaussian, rgba(0, 128, 255, 0.35), 36, 0.6, 0, 12);
+    -fx-font-family: "Segoe UI", "Inter", "Roboto", sans-serif;
+    -fx-text-fill: #e8f2ff;
 }
-.label {
-    -fx-text-fill: #f4f7ff;
+
+.metric {
+    -fx-text-fill: linear-gradient(to right, #d8e7ff, #9cd4ff);
+    -fx-font-size: 18px;
+    -fx-font-weight: 600;
 }
-.button.danger {
-    -fx-background-color: linear-gradient(to bottom right, #ff4f6d, #e62350);
-    -fx-text-fill: white;
-    -fx-background-radius: 14px;
-    -fx-padding: 8px 18px;
-    -fx-font-weight: bold;
+
+.status-label {
+    -fx-opacity: 0;
+    -fx-text-fill: rgba(255, 255, 255, 0.8);
+    -fx-font-size: 14px;
+    -fx-padding: 4 0 0 0;
+    -fx-transition: opacity 220ms ease-in-out;
 }
-.button.danger:hover {
-    -fx-background-color: linear-gradient(to bottom right, #ff7486, #ff4164);
+
+.status-label.status-visible {
+    -fx-opacity: 1;
 }
+
+.slider-title {
+    -fx-text-fill: rgba(210, 225, 255, 0.85);
+    -fx-font-size: 13px;
+    -fx-font-weight: 500;
+}
+
 .slider .track {
-    -fx-background-color: rgba(255, 255, 255, 0.2);
-    -fx-background-radius: 12px;
+    -fx-background-color: rgba(255, 255, 255, 0.18);
+    -fx-background-radius: 14px;
 }
+
 .slider .thumb {
-    -fx-background-color: linear-gradient(to bottom right, #29d4ff, #0f89ff);
+    -fx-background-color: linear-gradient(to bottom right, #38b8ff, #247dff);
     -fx-background-radius: 50%;
+    -fx-effect: dropshadow(gaussian, rgba(36, 125, 255, 0.6), 10, 0.3, 0, 2);
+}
+
+.button {
+    -fx-background-radius: 18px;
+    -fx-padding: 8px 20px;
+    -fx-font-weight: 600;
+    -fx-text-fill: white;
+    -fx-background-color: rgba(255, 255, 255, 0.05);
+    -fx-border-color: rgba(255, 255, 255, 0.2);
+    -fx-border-radius: 18px;
+}
+
+.button:hover {
+    -fx-background-color: rgba(255, 255, 255, 0.12);
+}
+
+.button.primary {
+    -fx-background-color: linear-gradient(to bottom right, #34d1ff, #2c89ff);
+    -fx-border-color: transparent;
+}
+
+.button.primary:hover {
+    -fx-background-color: linear-gradient(to bottom right, #5fe2ff, #5aa6ff);
+}
+
+.button.danger {
+    -fx-background-color: linear-gradient(to bottom right, #ff5e7a, #ff335e);
+    -fx-border-color: transparent;
+}
+
+.button.danger:hover {
+    -fx-background-color: linear-gradient(to bottom right, #ff7f97, #ff4b77);
+}
+
+.label.highlight {
+    -fx-effect: dropshadow(gaussian, rgba(255, 255, 255, 0.45), 30, 0.6, 0, 0);
 }

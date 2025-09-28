@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import com.jme3.math.Vector3f;
 import java.util.ArrayList;
 import java.util.List;
+import net.limitmedia.pong.core.gameplay.PhysicsTuning;
 import net.limitmedia.pong.core.physics.PhysicsEngine.CollisionEvent;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -23,7 +24,8 @@ class PhysicsEngineTest {
         right = new PaddleState();
         right.position().set(0, 0, 0);
         collisions = new ArrayList<>();
-        engine = new PhysicsEngine(ArenaDimensions.COMPETITIVE, 0.9f, 0.95f, 2.2f, collisions::add);
+        PhysicsTuning tuning = new PhysicsTuning(0.9f, 0.95f, 2.2f, 0.07f, 0.6f, 6f, 40f, 0.55f);
+        engine = new PhysicsEngine(ArenaDimensions.COMPETITIVE, tuning, collisions::add);
     }
 
     @Test

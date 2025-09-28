@@ -54,17 +54,15 @@ public final class ClientNetworkManager implements Closeable {
 
     public void update(float tpf, BallState ball, PaddleState left, PaddleState right) {
         elapsed += tpf;
-        if (channel == null) {
+        if (!isConnected()) {
             // offline simulation
             return;
         }
-        if (channel.isSuccess() && channel.channel().isActive()) {
-            NetworkFrame frame = new NetworkFrame(null, 0L, Instant.now(),
-                    vector(ball.position()), vector(ball.velocity()),
-                    vector(left.position()), vector(right.position()),
-                    score, compensator.getAverage());
-            channel.channel().writeAndFlush(frame);
-        }
+        NetworkFrame frame = new NetworkFrame(null, 0L, Instant.now(),
+                vector(ball.position()), vector(ball.velocity()),
+                vector(left.position()), vector(right.position()),
+                score, compensator.getAverage());
+        channel.channel().writeAndFlush(frame);
     }
 
     public MatchState.Score getScore() {
@@ -77,6 +75,10 @@ public final class ClientNetworkManager implements Closeable {
 
     public float getPing() {
         return compensator.getAverage();
+    }
+
+    public boolean isConnected() {
+        return channel != null && channel.isSuccess() && channel.channel().isActive();
     }
 
     private static float[] vector(com.jme3.math.Vector3f v) {

@@ -106,15 +106,58 @@ public record GameConfig(
             @JsonProperty("enableSpin") boolean enableSpin,
             @JsonProperty("powerUps") boolean powerUps,
             @JsonProperty("maxScore") int maxScore,
-            @JsonProperty("tickRate") int tickRate
+            @JsonProperty("tickRate") int tickRate,
+            @JsonProperty("arenaProfile") ArenaProfileType arenaProfile,
+            @JsonProperty("cameraStyle") CameraStyle cameraStyle,
+            @JsonProperty("aiErrorMargin") float aiErrorMargin,
+            @JsonProperty("ballTrail") boolean ballTrail,
+            @JsonProperty("physics") PhysicsSettings physics
     ) {
         public GameplaySettings {
             botDifficulty = botDifficulty == null ? BotDifficulty.MEDIUM : botDifficulty;
             maxScore = Math.max(maxScore, 3);
             tickRate = Math.max(30, Math.min(240, tickRate));
+            arenaProfile = arenaProfile == null ? ArenaProfileType.CLASSIC : arenaProfile;
+            cameraStyle = cameraStyle == null ? CameraStyle.TOP_DOWN : cameraStyle;
+            physics = physics == null ? PhysicsSettings.defaults() : physics;
+            aiErrorMargin = Math.max(0f, Math.min(0.5f, aiErrorMargin));
         }
 
         public enum BotDifficulty { EASY, MEDIUM, HARD }
+
+        public enum ArenaProfileType { CLASSIC, EXTENDED, VERTICAL }
+
+        public enum CameraStyle { TOP_DOWN, ANGLED, COURTSIDE }
+
+        public record PhysicsSettings(
+                @JsonProperty("wallRestitution") float wallRestitution,
+                @JsonProperty("paddleRestitution") float paddleRestitution,
+                @JsonProperty("spinInfluence") float spinInfluence,
+                @JsonProperty("linearDamping") float linearDamping,
+                @JsonProperty("spinDamping") float spinDamping,
+                @JsonProperty("minSpeed") float minSpeed,
+                @JsonProperty("maxSpeed") float maxSpeed,
+                @JsonProperty("paddleControl") float paddleControl
+        ) {
+            public PhysicsSettings {
+                wallRestitution = clamp(wallRestitution, 0.5f, 1.1f);
+                paddleRestitution = clamp(paddleRestitution, 0.5f, 1.1f);
+                spinInfluence = Math.max(0f, spinInfluence);
+                linearDamping = clamp(linearDamping, 0f, 1f);
+                spinDamping = clamp(spinDamping, 0f, 1f);
+                minSpeed = Math.max(2f, minSpeed);
+                maxSpeed = Math.max(minSpeed, maxSpeed);
+                paddleControl = clamp(paddleControl, 0f, 2f);
+            }
+
+            public static PhysicsSettings defaults() {
+                return new PhysicsSettings(0.92f, 0.96f, 1.8f, 0.08f, 0.65f, 6.5f, 42f, 0.55f);
+            }
+
+            private static float clamp(float value, float min, float max) {
+                return Math.max(min, Math.min(max, value));
+            }
+        }
     }
 
     public record AccessibilitySettings(

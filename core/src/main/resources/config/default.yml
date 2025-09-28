@@ -19,6 +19,19 @@ gameplay:
   powerUps: true
   maxScore: 11
   tickRate: 120
+  arenaProfile: CLASSIC
+  cameraStyle: ANGLED
+  aiErrorMargin: 0.12
+  ballTrail: true
+  physics:
+    wallRestitution: 0.92
+    paddleRestitution: 0.96
+    spinInfluence: 1.8
+    linearDamping: 0.08
+    spinDamping: 0.65
+    minSpeed: 6.5
+    maxSpeed: 42.0
+    paddleControl: 0.55
 accessibility:
   colorBlindMode: OFF
   uiScale: 1.0
