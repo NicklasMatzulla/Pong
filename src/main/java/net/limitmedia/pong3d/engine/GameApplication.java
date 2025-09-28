@@ -1,6 +1,8 @@
 package net.limitmedia.pong3d.engine;
 
 import net.limitmedia.pong3d.audio.AmbientAudioEngine;
+import net.limitmedia.pong3d.network.NetworkClient;
+import net.limitmedia.pong3d.network.NetworkServer;
 import net.limitmedia.pong3d.state.GameScreen;
 import net.limitmedia.pong3d.state.MainMenuScreen;
 import org.lwjgl.Version;
@@ -13,6 +15,7 @@ import org.lwjgl.opengl.GL11;
 public final class GameApplication implements Runnable {
     private static final int INITIAL_WIDTH = 1280;
     private static final int INITIAL_HEIGHT = 720;
+    private static final int NETWORK_PORT = 5050;
 
     private long window;
     private int width = INITIAL_WIDTH;
@@ -22,6 +25,7 @@ public final class GameApplication implements Runnable {
     private Screen currentScreen;
     private final Input input = new Input();
     private AmbientAudioEngine audioEngine;
+    private NetworkServer hostedServer;
 
     private double lastTime;
 
@@ -46,11 +50,47 @@ public final class GameApplication implements Runnable {
     }
 
     public void returnToMenu() {
-        setScreen(new MainMenuScreen(this));
+        stopHostedServer();
+        showMainMenu(null);
+    }
+
+    public void showMainMenu(String statusMessage) {
+        setScreen(new MainMenuScreen(this, statusMessage));
     }
 
     public void requestExit() {
         running = false;
+    }
+
+    public void startNetworkHost() {
+        stopHostedServer();
+        try {
+            NetworkServer server = new NetworkServer(NETWORK_PORT);
+            server.start();
+            hostedServer = server;
+            NetworkClient client = NetworkClient.connect("127.0.0.1", NETWORK_PORT);
+            setScreen(new GameScreen(this, GameScreen.Mode.NETWORK, client, server));
+        } catch (Exception ex) {
+            stopHostedServer();
+            showMainMenu("Serverstart fehlgeschlagen: " + ex.getMessage());
+        }
+    }
+
+    public void startNetworkJoin(String host) {
+        stopHostedServer();
+        try {
+            NetworkClient client = NetworkClient.connect(host, NETWORK_PORT);
+            setScreen(new GameScreen(this, GameScreen.Mode.NETWORK, client, null));
+        } catch (Exception ex) {
+            showMainMenu("Verbindung fehlgeschlagen: " + ex.getMessage());
+        }
+    }
+
+    private void stopHostedServer() {
+        if (hostedServer != null) {
+            hostedServer.close();
+            hostedServer = null;
+        }
     }
 
     public Input getInput() {
@@ -107,7 +147,7 @@ public final class GameApplication implements Runnable {
         GL11.glEnable(GL11.GL_BLEND);
         GL11.glBlendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA);
 
-        setScreen(new MainMenuScreen(this));
+        showMainMenu(null);
         running = true;
         lastTime = GLFW.glfwGetTime();
     }
@@ -151,6 +191,7 @@ public final class GameApplication implements Runnable {
             currentScreen.onExit();
             currentScreen = null;
         }
+        stopHostedServer();
         if (audioEngine != null) {
             audioEngine.close();
             audioEngine = null;

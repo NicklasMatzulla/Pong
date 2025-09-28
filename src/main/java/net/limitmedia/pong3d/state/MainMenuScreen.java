@@ -11,14 +11,20 @@ public final class MainMenuScreen implements Screen {
     private final GameApplication app;
     private final MenuButton[] buttons;
     private final AmbientAudioEngine audio;
+    private final String statusMessage;
+    private final JoinDialog joinDialog;
     private int selectedIndex;
     private float time;
 
-    public MainMenuScreen(GameApplication app) {
+    public MainMenuScreen(GameApplication app, String statusMessage) {
         this.app = app;
         this.audio = app.getAudioEngine();
+        this.statusMessage = statusMessage;
+        this.joinDialog = new JoinDialog();
         this.buttons = new MenuButton[] {
-                new MenuButton("Sofort spielen", "Starte das Solo Match mit smoother Physik", app::startSoloMatch),
+                new MenuButton("Einzelspieler", "Starte das Solo Match mit smoother Physik", app::startSoloMatch),
+                new MenuButton("Multiplayer hosten", "Erstelle einen Server und lade Spieler ein", app::startNetworkHost),
+                new MenuButton("Multiplayer beitreten", "Verbinde dich mit einer bestehenden Session", joinDialog::open),
                 new MenuButton("Beenden", "Schließe die holografische Arena", app::requestExit)
         };
     }
@@ -42,10 +48,16 @@ public final class MainMenuScreen implements Screen {
         Input input = app.getInput();
 
         layoutButtons();
+        if (joinDialog.update(deltaTime, input)) {
+            return;
+        }
         handleSelection(input);
     }
 
     private void handleSelection(Input input) {
+        if (joinDialog.isVisible()) {
+            return;
+        }
         if (input.wasPressed(GLFW.GLFW_KEY_UP) || input.wasPressed(GLFW.GLFW_KEY_W)) {
             selectedIndex = (selectedIndex - 1 + buttons.length) % buttons.length;
         }
@@ -124,7 +136,15 @@ public final class MainMenuScreen implements Screen {
         }
 
         Draw.text("LWJGL 3 • 144Hz bereit • Keine Fullscreen-Pflicht", width * 0.5f - 220f, height - 60f, 1.2f, 0.62f, 0.76f, 0.92f, 0.75f);
+        if (statusMessage != null && !statusMessage.isEmpty()) {
+            float statusX = width * 0.5f - Math.min(320f, statusMessage.length() * 7.2f);
+            Draw.text(statusMessage, statusX, height - 92f, 1.25f, 0.88f, 0.94f, 1f, 0.88f);
+        }
         Draw.text("Limit Media Labs 2025", width * 0.5f - 120f, height - 32f, 1.1f, 0.52f, 0.64f, 0.82f, 0.65f);
+
+        if (joinDialog.isVisible()) {
+            joinDialog.render(width, height);
+        }
     }
 
     private void renderButton(MenuButton button, boolean selected, float glow) {
@@ -138,6 +158,93 @@ public final class MainMenuScreen implements Screen {
                 baseAlpha);
         Draw.text(button.label, button.x + 30f, button.y + button.height / 2f + 6f, 2.0f, 0.92f, 0.96f, 1f, 1f);
         Draw.text(button.description, button.x + 30f, button.y + button.height / 2f + 34f, 1.2f, 0.75f, 0.85f, 1f, selected ? 0.9f : 0.75f);
+    }
+
+    private final class JoinDialog {
+        private boolean visible;
+        private final StringBuilder host = new StringBuilder("127.0.0.1");
+        private float pulse;
+
+        void open() {
+            visible = true;
+            pulse = 0f;
+            if (host.length() == 0) {
+                host.append("127.0.0.1");
+            }
+        }
+
+        boolean update(float deltaTime, Input input) {
+            if (!visible) {
+                return false;
+            }
+            pulse += deltaTime;
+            String typed = input.consumeTypedChars();
+            if (!typed.isEmpty()) {
+                for (int i = 0; i < typed.length(); i++) {
+                    char c = typed.charAt(i);
+                    if (isAllowed(c)) {
+                        if (host.length() < 64) {
+                            host.append(c);
+                        }
+                    }
+                }
+            }
+            if (input.wasPressed(GLFW.GLFW_KEY_BACKSPACE) && host.length() > 0) {
+                host.setLength(host.length() - 1);
+            }
+            if (input.wasPressed(GLFW.GLFW_KEY_ESCAPE)) {
+                visible = false;
+                return true;
+            }
+            if ((input.wasPressed(GLFW.GLFW_KEY_ENTER) || input.wasPressed(GLFW.GLFW_KEY_KP_ENTER)) && host.length() > 0) {
+                String target = host.toString().trim();
+                if (target.isEmpty()) {
+                    target = "127.0.0.1";
+                }
+                visible = false;
+                app.startNetworkJoin(target);
+                return true;
+            }
+            return true;
+        }
+
+        void render(int width, int height) {
+            if (!visible) {
+                return;
+            }
+            float overlayWidth = Math.min(width * 0.6f, 520f);
+            float overlayHeight = 240f;
+            float x = (width - overlayWidth) * 0.5f;
+            float y = height * 0.28f;
+
+            Draw.rect(0, 0, width, height, 0.02f, 0.03f, 0.05f, 0.68f);
+            Draw.rect(x, y, overlayWidth, overlayHeight, 0.1f, 0.12f, 0.18f, 0.95f);
+            Draw.rect(x, y, overlayWidth, 6f, 0.32f, 0.62f, 0.92f, 1f);
+            Draw.text("Serveradresse", x + 36f, y + 66f, 1.9f, 0.92f, 0.96f, 1f, 1f);
+            Draw.text("Bestätige mit Enter. Mit ESC schließt du das Feld.", x + 36f, y + 104f, 1.2f, 0.72f, 0.82f, 0.95f, 0.86f);
+
+            float fieldX = x + 32f;
+            float fieldY = y + 126f;
+            float fieldWidth = overlayWidth - 64f;
+            float fieldHeight = 68f;
+            Draw.rect(fieldX, fieldY, fieldWidth, fieldHeight, 0.07f, 0.09f, 0.15f, 0.96f);
+            Draw.rect(fieldX, fieldY, fieldWidth, 2f, 0.32f, 0.62f, 0.92f, 1f);
+            String text = host.toString();
+            if (text.isEmpty()) {
+                text = "127.0.0.1";
+            }
+            boolean caret = ((int) (pulse * 2f)) % 2 == 0;
+            String display = caret ? text + "_" : text + " ";
+            Draw.text(display, fieldX + 16f, fieldY + 46f, 1.6f, 0.88f, 0.94f, 1f, 1f);
+        }
+
+        boolean isVisible() {
+            return visible;
+        }
+
+        private boolean isAllowed(char c) {
+            return Character.isDigit(c) || Character.isLetter(c) || c == '.' || c == '-' || c == ':';
+        }
     }
 
     private static final class MenuButton {

@@ -1,6 +1,7 @@
 package net.limitmedia.pong3d.engine;
 
 import org.lwjgl.glfw.GLFW;
+import org.lwjgl.glfw.GLFWCharCallbackI;
 import org.lwjgl.glfw.GLFWCursorPosCallbackI;
 import org.lwjgl.glfw.GLFWKeyCallbackI;
 import org.lwjgl.glfw.GLFWMouseButtonCallbackI;
@@ -16,17 +17,20 @@ public final class Input {
     private double mouseY;
     private boolean mouseDown;
     private boolean mouseClicked;
+    private final StringBuilder typedChars = new StringBuilder();
 
     public void register(long window) {
         GLFW.glfwSetKeyCallback(window, keyCallback);
         GLFW.glfwSetCursorPosCallback(window, cursorCallback);
         GLFW.glfwSetMouseButtonCallback(window, mouseCallback);
+        GLFW.glfwSetCharCallback(window, charCallback);
     }
 
     public void beginFrame() {
         Arrays.fill(pressed, false);
         Arrays.fill(released, false);
         mouseClicked = false;
+        typedChars.setLength(0);
     }
 
     public boolean isKeyDown(int key) {
@@ -57,6 +61,12 @@ public final class Input {
         return mouseClicked;
     }
 
+    public String consumeTypedChars() {
+        String result = typedChars.toString();
+        typedChars.setLength(0);
+        return result;
+    }
+
     private final GLFWKeyCallbackI keyCallback = (window, key, scancode, action, mods) -> {
         if (key < 0 || key >= keys.length) {
             return;
@@ -85,5 +95,15 @@ public final class Input {
             mouseDown = false;
             mouseClicked = true;
         }
+    };
+
+    private final GLFWCharCallbackI charCallback = (window, codepoint) -> {
+        if (codepoint == 0L) {
+            return;
+        }
+        if (Character.isISOControl((int) codepoint)) {
+            return;
+        }
+        typedChars.appendCodePoint((int) codepoint);
     };
 }
