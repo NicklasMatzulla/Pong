@@ -15,6 +15,9 @@ dependencies {
     implementation("org.openjfx:javafx-base:23")
     implementation("net.onedaybeard.artemis:artemis-odb:2.3.0")
     implementation("ch.qos.logback:logback-classic:1.5.6")
+    testImplementation(project(":core"))
+    testImplementation("org.jmonkeyengine:jme3-core:3.6.1-stable")
+    testImplementation("org.junit.jupiter:junit-jupiter:5.10.3")
 }
 
 javafx {

@@ -13,7 +13,9 @@ import io.netty.handler.codec.serialization.ObjectDecoder;
 import io.netty.handler.codec.serialization.ObjectEncoder;
 import java.io.Closeable;
 import java.time.Instant;
+import java.util.Objects;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import net.limitmedia.pong.core.match.MatchState;
 import net.limitmedia.pong.core.net.LagCompensator;
 import net.limitmedia.pong.core.net.NetworkFrame;
@@ -28,7 +30,7 @@ public final class ClientNetworkManager implements Closeable {
     private final LagCompensator compensator;
     private final NioEventLoopGroup eventLoop = new NioEventLoopGroup(1);
     private ChannelFuture channel;
-    private MatchState.Score score = new MatchState.Score(0, 0);
+    private final AtomicReference<MatchState.Score> score = new AtomicReference<>(new MatchState.Score(0, 0));
     private float elapsed;
 
     public ClientNetworkManager(LagCompensator compensator) {
@@ -36,6 +38,7 @@ public final class ClientNetworkManager implements Closeable {
     }
 
     public void connect(String host, int port) {
+        Objects.requireNonNull(host, "host");
         Bootstrap bootstrap = new Bootstrap()
                 .group(eventLoop)
                 .channel(NioSocketChannel.class)
@@ -48,8 +51,17 @@ public final class ClientNetworkManager implements Closeable {
                         ch.pipeline().addLast(new ClientHandler());
                     }
                 });
+        if (channel != null && channel.channel().isOpen()) {
+            channel.channel().close();
+        }
         channel = bootstrap.connect(host, port);
-        channel.addListener(future -> LOG.info("Connected to {}:{}? {}", host, port, future.isSuccess()));
+        channel.addListener(future -> {
+            if (future.isSuccess()) {
+                LOG.info("Connected to {}:{}", host, port);
+            } else {
+                LOG.error("Failed to connect to {}:{}", host, port, future.cause());
+            }
+        });
     }
 
     public void update(float tpf, BallState ball, PaddleState left, PaddleState right) {
@@ -61,12 +73,12 @@ public final class ClientNetworkManager implements Closeable {
         NetworkFrame frame = new NetworkFrame(null, 0L, Instant.now(),
                 vector(ball.position()), vector(ball.velocity()),
                 vector(left.position()), vector(right.position()),
-                score, compensator.getAverage());
+                score.get(), compensator.getAverage());
         channel.channel().writeAndFlush(frame);
     }
 
     public MatchState.Score getScore() {
-        return score;
+        return score.get();
     }
 
     public float getElapsed() {
@@ -97,7 +109,7 @@ public final class ClientNetworkManager implements Closeable {
         @Override
         protected void channelRead0(io.netty.channel.ChannelHandlerContext ctx, NetworkFrame msg) {
             compensator.record(msg.serverTime(), Instant.now());
-            score = msg.score();
+            score.set(msg.score());
         }
 
         @Override
