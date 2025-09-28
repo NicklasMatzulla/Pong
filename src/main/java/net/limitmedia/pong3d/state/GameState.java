@@ -35,11 +35,18 @@ import com.jme3.scene.shape.Box;
 import com.jme3.scene.shape.Quad;
 import com.jme3.scene.shape.Sphere;
 import com.jme3.scene.shape.Torus;
+import com.jme3.texture.Image;
+import com.jme3.texture.Texture;
+import com.jme3.texture.Texture2D;
+import com.jme3.texture.image.ImageRaster;
+import com.jme3.util.BufferUtils;
 
 import net.limitmedia.pong3d.audio.ProceduralAudioFactory;
 import net.limitmedia.pong3d.net.NetworkClient;
+import net.limitmedia.pong3d.ui.VaadinPalette;
 
 import java.util.Random;
+import java.nio.ByteBuffer;
 
 /**
  * Ansicht mit Sternen-Hintergrund, Glow, Trails und Maus-Kamerafahrt.
@@ -66,10 +73,10 @@ public class GameState extends BaseAppState implements ActionListener {
     private Material tableMaterial;
     private float backgroundTime = 0f;
     private final ColorRGBA[] backgroundPalette = new ColorRGBA[] {
-            new ColorRGBA(0.025f, 0.025f, 0.03f, 1f),
-            new ColorRGBA(0.04f, 0.04f, 0.05f, 1f),
-            new ColorRGBA(0.032f, 0.032f, 0.04f, 1f),
-            new ColorRGBA(0.055f, 0.055f, 0.065f, 1f)
+            VaadinPalette.DARK_SURFACE.clone(),
+            VaadinPalette.DARK_SURFACE_VARIANT.clone(),
+            VaadinPalette.MID_SURFACE.clone(),
+            VaadinPalette.LIGHT_SURFACE.clone()
     };
     private final ColorRGBA blendedBackground = new ColorRGBA();
     private final ColorRGBA auroraColor = new ColorRGBA();
@@ -80,7 +87,7 @@ public class GameState extends BaseAppState implements ActionListener {
     private boolean movePlayerLeft, movePlayerRight, moveEnemyLeft, moveEnemyRight;
     private int scorePlayer = 0, scoreEnemy = 0;
     private BitmapText hud;
-    private final ColorRGBA hudColor = new ColorRGBA(0.86f, 0.95f, 1f, 1f);
+    private final ColorRGBA hudColor = VaadinPalette.TEXT_HIGH.clone();
     private BitmapText networkStatusText;
     private float networkStatusPulse = 0f;
     private String currentNetworkMessage = "";
@@ -90,8 +97,8 @@ public class GameState extends BaseAppState implements ActionListener {
     private final float halfDepth = 10.25f;
 
     private final float ballRadius = 0.25f;
-    private final ColorRGBA playerColor = new ColorRGBA(0.3f,0.8f,1f,1f);
-    private final ColorRGBA enemyColor = new ColorRGBA(1f,0.3f,0.9f,1f);
+    private final ColorRGBA playerColor = VaadinPalette.ACCENT_PRIMARY_SOFT.clone();
+    private final ColorRGBA enemyColor = VaadinPalette.ACCENT_SECONDARY.clone();
 
     private final Node effects = new Node("fx");
 
@@ -110,7 +117,9 @@ public class GameState extends BaseAppState implements ActionListener {
     private final Vector3f cameraInitialFocus = new Vector3f();
     private final Vector3f tempCameraPos = new Vector3f();
     private final Vector3f cameraShakeOffset = new Vector3f();
-    private final ColorRGBA networkStatusBaseColor = new ColorRGBA(0.8f, 0.9f, 1f, 0.85f);
+    private float cameraShakePhase = 0f;
+    private float cameraShakeSeed = 0f;
+    private final ColorRGBA networkStatusBaseColor = VaadinPalette.TEXT_MEDIUM.clone();
 
     private final Random random = new Random();
 
@@ -134,6 +143,8 @@ public class GameState extends BaseAppState implements ActionListener {
 
     private AudioNode bounceSound;
     private AudioNode goalSound;
+    private Texture2D ballTexture;
+    private Material ballMaterial;
 
     public GameState(SimpleApplication app, Runnable onPause) {
         this(app, onPause, null);
@@ -195,8 +206,8 @@ public class GameState extends BaseAppState implements ActionListener {
         starfield.getParticleInfluencer().setVelocityVariation(1f);
         starfield.setStartSize(0.03f);
         starfield.setEndSize(0.03f);
-        starfield.setStartColor(new ColorRGBA(0.82f, 0.85f, 0.9f, 0.28f));
-        starfield.setEndColor(new ColorRGBA(0.78f, 0.8f, 0.84f, 0.04f));
+        starfield.setStartColor(VaadinPalette.withAlpha(VaadinPalette.TEXT_SUBTLE, 0.32f));
+        starfield.setEndColor(VaadinPalette.withAlpha(VaadinPalette.TEXT_SUBTLE, 0.08f));
         starfield.setImagesX(1);
         starfield.setImagesY(1);
         Material starMat = new Material(app.getAssetManager(), "Common/MatDefs/Misc/Unshaded.j3md");
@@ -207,7 +218,7 @@ public class GameState extends BaseAppState implements ActionListener {
         environment.attachChild(starfield);
 
         auroraMaterial = new Material(app.getAssetManager(), "Common/MatDefs/Misc/Unshaded.j3md");
-        auroraMaterial.setColor("Color", new ColorRGBA(0.16f, 0.18f, 0.2f, 0.18f));
+        auroraMaterial.setColor("Color", VaadinPalette.withAlpha(VaadinPalette.LIGHT_SURFACE, 0.12f));
         auroraMaterial.getAdditionalRenderState().setBlendMode(RenderState.BlendMode.Additive);
         Torus ringMesh = new Torus(64, 16, 0.4f, halfWidth + 5f);
         auroraRing = new Geometry("aurora-ring", ringMesh);
@@ -231,29 +242,23 @@ public class GameState extends BaseAppState implements ActionListener {
         Material matBlue = new Material(app.getAssetManager(), "Common/MatDefs/Light/Lighting.j3md");
         matBlue.setBoolean("UseMaterialColors", true);
         matBlue.setColor("Diffuse", playerColor.clone());
-        matBlue.setColor("Specular", new ColorRGBA(0.7f,0.9f,1f,1f));
-        matBlue.setColor("GlowColor", playerColor.clone());
-        matBlue.setFloat("Shininess", 24f);
+        matBlue.setColor("Specular", VaadinPalette.TEXT_MEDIUM.clone());
+        matBlue.setColor("GlowColor", VaadinPalette.withAlpha(playerColor, 0.6f));
+        matBlue.setFloat("Shininess", 28f);
 
         Material matRed = new Material(app.getAssetManager(), "Common/MatDefs/Light/Lighting.j3md");
         matRed.setBoolean("UseMaterialColors", true);
         matRed.setColor("Diffuse", enemyColor.clone());
-        matRed.setColor("Specular", new ColorRGBA(1f,0.8f,1f,1f));
-        matRed.setColor("GlowColor", enemyColor.clone());
-        matRed.setFloat("Shininess", 24f);
+        matRed.setColor("Specular", VaadinPalette.TEXT_MEDIUM.clone());
+        matRed.setColor("GlowColor", VaadinPalette.withAlpha(enemyColor, 0.55f));
+        matRed.setFloat("Shininess", 28f);
 
         Material matTable = new Material(app.getAssetManager(), "Common/MatDefs/Light/Lighting.j3md");
         matTable.setBoolean("UseMaterialColors", true);
-        matTable.setColor("Diffuse", new ColorRGBA(0.08f,0.08f,0.09f,1f));
-        matTable.setColor("Specular", new ColorRGBA(0.18f,0.18f,0.18f,1f));
-        matTable.setFloat("Shininess", 10f);
-
-        Material matBall = new Material(app.getAssetManager(), "Common/MatDefs/Light/Lighting.j3md");
-        matBall.setBoolean("UseMaterialColors", true);
-        matBall.setColor("Diffuse", ColorRGBA.White);
-        matBall.setColor("Specular", new ColorRGBA(1f,1f,1f,1f));
-        matBall.setColor("GlowColor", new ColorRGBA(1f,1f,1f,0.6f));
-        matBall.setFloat("Shininess", 64f);
+        matTable.setColor("Diffuse", VaadinPalette.DARK_SURFACE.clone());
+        matTable.setColor("Specular", VaadinPalette.withAlpha(VaadinPalette.TEXT_SUBTLE, 1f));
+        matTable.setFloat("Shininess", 12f);
+        ballMaterial = createBallMaterial();
 
         // Tisch
         tableMaterial = matTable;
@@ -294,9 +299,10 @@ public class GameState extends BaseAppState implements ActionListener {
         enemyPaddle.setLocalTranslation(0, 0.5f, -halfDepth + 0.6f);
 
         // Ball
-        Sphere sph = new Sphere(24, 24, ballRadius);
+        Sphere sph = new Sphere(32, 32, ballRadius);
+        sph.setTextureMode(Sphere.TextureMode.Projected);
         ball = new Geometry("ball", sph);
-        ball.setMaterial(matBall);
+        ball.setMaterial(ballMaterial);
         ball.setLocalTranslation(0, ballRadius, 0);
 
         root.attachChild(playerPaddle);
@@ -470,20 +476,22 @@ public class GameState extends BaseAppState implements ActionListener {
         Vector3f ballPos = ball.getLocalTranslation();
         if (ballPos.x > halfWidth - ballRadius && ballVel.x > 0) {
             ball.setLocalTranslation(halfWidth - ballRadius, ballPos.y, ballPos.z);
-            float newX = -FastMath.abs(ballVel.x) * (0.82f + random.nextFloat() * 0.08f);
-            float newZ = ballVel.z * (0.98f + random.nextFloat() * 0.035f);
-            float newY = Math.max(ballVel.y, 2.6f + FastMath.abs(ballVel.z) * 0.04f);
-            scheduleBallResponse(newX, newY, newZ, 0.18f);
-            triggerCameraShake(0.1f, 0.16f);
+            float newXScale = FastMath.interpolateLinear(random.nextFloat(), 0.72f, 0.9f);
+            float newX = -FastMath.abs(ballVel.x) * newXScale;
+            float newZ = ballVel.z * 0.97f;
+            float newY = Math.max(ballVel.y, 2.2f + FastMath.abs(ballVel.z) * 0.035f);
+            scheduleBallResponse(newX, newY, newZ, 0.2f);
+            triggerCameraShake(0.05f, 0.14f);
             spawnImpactEffect(ball.getLocalTranslation().clone(), playerColor);
             playBounceSound();
         } else if (ballPos.x < -halfWidth + ballRadius && ballVel.x < 0) {
             ball.setLocalTranslation(-halfWidth + ballRadius, ballPos.y, ballPos.z);
-            float newX = FastMath.abs(ballVel.x) * (0.82f + random.nextFloat() * 0.08f);
-            float newZ = ballVel.z * (0.98f + random.nextFloat() * 0.035f);
-            float newY = Math.max(ballVel.y, 2.6f + FastMath.abs(ballVel.z) * 0.04f);
-            scheduleBallResponse(newX, newY, newZ, 0.18f);
-            triggerCameraShake(0.1f, 0.16f);
+            float newXScale = FastMath.interpolateLinear(random.nextFloat(), 0.72f, 0.9f);
+            float newX = FastMath.abs(ballVel.x) * newXScale;
+            float newZ = ballVel.z * 0.97f;
+            float newY = Math.max(ballVel.y, 2.2f + FastMath.abs(ballVel.z) * 0.035f);
+            scheduleBallResponse(newX, newY, newZ, 0.2f);
+            triggerCameraShake(0.05f, 0.14f);
             spawnImpactEffect(ball.getLocalTranslation().clone(), enemyColor);
             playBounceSound();
         }
@@ -504,13 +512,13 @@ public class GameState extends BaseAppState implements ActionListener {
         if (ball.getLocalTranslation().z > halfDepth + 0.35f) {
             scoreEnemy++;
             spawnGoalEffect(false);
-            triggerCameraShake(0.22f, 0.32f);
+            triggerCameraShake(0.14f, 0.28f);
             playGoalSound();
             resetBall(false);
         } else if (ball.getLocalTranslation().z < -halfDepth - 0.35f) {
             scorePlayer++;
             spawnGoalEffect(true);
-            triggerCameraShake(0.22f, 0.32f);
+            triggerCameraShake(0.14f, 0.28f);
             playGoalSound();
             resetBall(true);
         }
@@ -579,13 +587,10 @@ public class GameState extends BaseAppState implements ActionListener {
             starfield.setEndColor(end);
         }
 
-        float auroraPulse = 0.12f + FastMath.sin(backgroundTime * 0.9f) * 0.08f;
+        float accent = 0.18f + FastMath.sin(backgroundTime * 0.6f) * 0.08f;
         auroraColor.set(blendedBackground);
-        float accent = 0.06f + FastMath.sin(backgroundTime * 0.4f) * 0.035f;
-        auroraColor.r = FastMath.clamp(auroraColor.r + accent, 0f, 0.36f);
-        auroraColor.g = FastMath.clamp(auroraColor.g + accent * 1.1f, 0f, 0.4f);
-        auroraColor.b = FastMath.clamp(auroraColor.b + accent * 1.35f, 0f, 0.46f);
-        auroraColor.a = FastMath.clamp(auroraPulse, 0.06f, 0.22f);
+        auroraColor.interpolateLocal(VaadinPalette.ACCENT_PRIMARY_SOFT, accent * 0.35f);
+        auroraColor.a = FastMath.clamp(0.08f + accent * 0.18f, 0.05f, 0.28f);
 
         if (auroraMaterial != null) {
             auroraMaterial.setColor("Color", auroraColor);
@@ -595,8 +600,9 @@ public class GameState extends BaseAppState implements ActionListener {
         }
 
         if (ribbonMaterial != null) {
-            ribbonColor.set(auroraColor);
-            ribbonColor.a = 0.08f + FastMath.sin(backgroundTime * 0.7f) * 0.05f;
+            ribbonColor.set(blendedBackground);
+            ribbonColor.interpolateLocal(VaadinPalette.ACCENT_SECONDARY, accent * 0.25f);
+            ribbonColor.a = 0.06f + FastMath.sin(backgroundTime * 0.7f) * 0.04f;
             ribbonMaterial.setColor("Color", ribbonColor);
         }
         if (auroraRibbon != null) {
@@ -604,23 +610,17 @@ public class GameState extends BaseAppState implements ActionListener {
         }
 
         if (tableMaterial != null) {
-            ColorRGBA tableDiffuse = new ColorRGBA(
-                    FastMath.clamp(blendedBackground.r * 0.4f + 0.08f, 0f, 1f),
-                    FastMath.clamp(blendedBackground.g * 0.3f + 0.07f, 0f, 1f),
-                    FastMath.clamp(blendedBackground.b * 0.5f + 0.1f, 0f, 1f),
-                    1f);
+            ColorRGBA tableDiffuse = blendedBackground.clone();
+            tableDiffuse.interpolateLocal(VaadinPalette.MID_SURFACE, 0.45f);
             tableMaterial.setColor("Diffuse", tableDiffuse);
         }
 
-        hudColor.set(
-                FastMath.clamp(0.6f + blendedBackground.r * 0.35f, 0f, 1f),
-                FastMath.clamp(0.75f + blendedBackground.g * 0.2f, 0f, 1f),
-                FastMath.clamp(0.85f + blendedBackground.b * 0.25f, 0f, 1f),
-                1f);
+        hudColor.set(VaadinPalette.TEXT_HIGH);
+        hudColor.interpolateLocal(VaadinPalette.TEXT_MEDIUM, accent * 0.25f);
 
-        networkStatusBaseColor.r = FastMath.clamp(0.6f + blendedBackground.r * 0.25f, 0f, 1f);
-        networkStatusBaseColor.g = FastMath.clamp(0.75f + blendedBackground.g * 0.2f, 0f, 1f);
-        networkStatusBaseColor.b = FastMath.clamp(0.95f + blendedBackground.b * 0.15f, 0f, 1f);
+        networkStatusBaseColor.set(VaadinPalette.TEXT_MEDIUM);
+        networkStatusBaseColor.interpolateLocal(VaadinPalette.ACCENT_SECONDARY, accent * 0.2f);
+        networkStatusBaseColor.a = 0.85f;
     }
 
     private void setNetworkStatus(String text, boolean visible) {
@@ -929,16 +929,16 @@ public class GameState extends BaseAppState implements ActionListener {
         float diff = ball.getLocalTranslation().x - paddle.getLocalTranslation().x;
         float offset = FastMath.clamp(diff / 1.4f, -1f, 1f);
         float incomingSpeed = FastMath.abs(ballVel.z);
-        float targetSpeed = FastMath.clamp(incomingSpeed * 1.04f + 0.4f, 6.5f, 22f);
-        float horizontalAim = FastMath.interpolateLinear(0.42f, ballVel.x, offset * targetSpeed * 0.75f);
-        float verticalBoost = (playerSide ? 6.1f : 5.6f) + FastMath.abs(offset) * 2.4f;
+        float targetSpeed = FastMath.clamp(incomingSpeed * 1.02f + 0.3f, 6f, 18f);
+        float horizontalAim = FastMath.interpolateLinear(0.35f, ballVel.x, offset * targetSpeed * 0.65f);
+        float verticalBoost = (playerSide ? 4.6f : 4.2f) + FastMath.abs(offset) * 1.8f;
         float targetZ = playerSide ? -targetSpeed : targetSpeed;
-        scheduleBallResponse(horizontalAim, verticalBoost, targetZ, 0.26f);
+        scheduleBallResponse(horizontalAim, verticalBoost, targetZ, 0.24f);
 
         float clampedZ = playerSide ? halfDepth - 0.62f : -halfDepth + 0.62f;
         ball.setLocalTranslation(ball.getLocalTranslation().x, ball.getLocalTranslation().y, clampedZ);
 
-        triggerCameraShake(playerSide ? 0.16f : 0.14f, 0.22f);
+        triggerCameraShake(playerSide ? 0.08f : 0.07f, 0.18f);
         spawnImpactEffect(ball.getLocalTranslation().clone(), playerSide ? playerColor : enemyColor);
         playBounceSound();
     }
@@ -960,6 +960,7 @@ public class GameState extends BaseAppState implements ActionListener {
             return;
         }
         cameraShakeElapsed += tpf;
+        cameraShakePhase += tpf * 32f;
         if (cameraShakeElapsed >= cameraShakeDuration) {
             cameraShakeDuration = 0f;
             cameraShakeElapsed = 0f;
@@ -969,10 +970,11 @@ public class GameState extends BaseAppState implements ActionListener {
         }
         float progress = cameraShakeElapsed / cameraShakeDuration;
         float falloff = (1f - progress);
+        float angle = cameraShakeSeed + cameraShakePhase;
         cameraShakeOffset.set(
-                (random.nextFloat() * 2f - 1f) * cameraShakeStrength * 0.6f * falloff,
+                FastMath.sin(angle) * cameraShakeStrength * 0.45f * falloff,
                 0f,
-                (random.nextFloat() * 2f - 1f) * cameraShakeStrength * 0.4f * falloff
+                FastMath.cos(angle * 0.82f) * cameraShakeStrength * 0.32f * falloff
         );
         tempCameraPos.set(
                 cameraBasePos.x + cameraShakeOffset.x,
@@ -984,9 +986,59 @@ public class GameState extends BaseAppState implements ActionListener {
 
     private void triggerCameraShake(float strength, float duration) {
         float remaining = Math.max(cameraShakeDuration - cameraShakeElapsed, 0f);
-        cameraShakeStrength = Math.max(cameraShakeStrength, strength);
-        cameraShakeDuration = remaining + duration;
+        cameraShakeStrength = Math.min(0.22f, Math.max(cameraShakeStrength, strength));
+        cameraShakeDuration = FastMath.clamp(remaining + duration, 0f, 0.6f);
         cameraShakeElapsed = 0f;
+        cameraShakePhase = 0f;
+        cameraShakeSeed = random.nextFloat() * FastMath.TWO_PI;
+    }
+
+    private Material createBallMaterial() {
+        if (ballTexture == null) {
+            ballTexture = buildBallTexture();
+        }
+        Material material = new Material(app.getAssetManager(), "Common/MatDefs/Light/Lighting.j3md");
+        material.setBoolean("UseMaterialColors", false);
+        material.setTexture("DiffuseMap", ballTexture);
+        material.setTexture("GlowMap", ballTexture);
+        material.setColor("Specular", VaadinPalette.TEXT_HIGH.clone());
+        material.setFloat("Shininess", 56f);
+        return material;
+    }
+
+    private Texture2D buildBallTexture() {
+        int size = 256;
+        ByteBuffer buffer = BufferUtils.createByteBuffer(size * size * 4);
+        Image image = new Image(Image.Format.RGBA8, size, size, buffer);
+        ImageRaster raster = ImageRaster.create(image);
+        ColorRGBA base = VaadinPalette.TEXT_HIGH.clone();
+        ColorRGBA accent = VaadinPalette.ACCENT_PRIMARY.clone();
+        ColorRGBA pixel = new ColorRGBA();
+        for (int y = 0; y < size; y++) {
+            float v = y / (float) (size - 1);
+            float lat = FastMath.cos((v - 0.5f) * FastMath.PI);
+            for (int x = 0; x < size; x++) {
+                float u = x / (float) (size - 1);
+                float band = FastMath.abs(FastMath.sin(u * FastMath.TWO_PI * 2.2f));
+                float accentBlend = FastMath.pow(band, 3f);
+                pixel.set(base);
+                pixel.interpolateLocal(accent, accentBlend * 0.45f);
+                float highlight = FastMath.pow(FastMath.clamp(1f - FastMath.abs(u - 0.35f) * 1.6f, 0f, 1f), 3f);
+                highlight += FastMath.pow(FastMath.clamp(1f - FastMath.abs(u - 0.65f) * 1.6f, 0f, 1f), 3f);
+                float shade = 0.82f + lat * 0.14f;
+                pixel.r *= shade;
+                pixel.g *= shade;
+                pixel.b *= shade;
+                pixel.r = FastMath.clamp(pixel.r + highlight * 0.08f, 0f, 1f);
+                pixel.g = FastMath.clamp(pixel.g + highlight * 0.08f, 0f, 1f);
+                pixel.b = FastMath.clamp(pixel.b + highlight * 0.1f, 0f, 1f);
+                raster.setPixel(x, y, pixel);
+            }
+        }
+        Texture2D texture = new Texture2D(image);
+        texture.setMinFilter(Texture.MinFilter.Trilinear);
+        texture.setMagFilter(Texture.MagFilter.Bilinear);
+        return texture;
     }
 
     private void spawnImpactEffect(Vector3f position, ColorRGBA color) {

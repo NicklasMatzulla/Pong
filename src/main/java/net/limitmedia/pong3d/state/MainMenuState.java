@@ -31,6 +31,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import net.limitmedia.pong3d.audio.ProceduralAudioFactory;
+import net.limitmedia.pong3d.ui.VaadinPalette;
 
 /**
  * Neon styled main and pause menu with clickable buttons and keyboard navigation.
@@ -59,8 +60,8 @@ public class MainMenuState extends BaseAppState implements ActionListener {
     private BitmapFont largeFont;
     private BitmapFont smallFont;
 
-    private final ColorRGBA accentColor = new ColorRGBA(0.62f, 0.75f, 0.95f, 1f);
-    private final ColorRGBA titleColor = new ColorRGBA(0.92f, 0.95f, 1f, 1f);
+    private final ColorRGBA accentColor = VaadinPalette.ACCENT_PRIMARY.clone();
+    private final ColorRGBA titleColor = VaadinPalette.TEXT_HIGH.clone();
 
     private int selectedIndex = 0;
     private boolean pointerPressed = false;
@@ -76,7 +77,7 @@ public class MainMenuState extends BaseAppState implements ActionListener {
     private float heroRotation = 0f;
     private float heroTime = 0f;
     private float heroCardHeight;
-    private final ColorRGBA heroTrailColor = new ColorRGBA(0.32f, 0.75f, 1f, 0.3f);
+    private final ColorRGBA heroTrailColor = VaadinPalette.withAlpha(VaadinPalette.ACCENT_PRIMARY_SOFT, 0.32f);
     private float panelX;
     private float panelY;
     private float buttonColumnX;
@@ -106,10 +107,10 @@ public class MainMenuState extends BaseAppState implements ActionListener {
         float height = app.getCamera().getHeight();
 
         Geometry backdrop = createGradientQuad(width, height,
-                new ColorRGBA(0.015f, 0.015f, 0.02f, pauseMenu ? 0.5f : 0.94f),
-                new ColorRGBA(0.03f, 0.03f, 0.035f, pauseMenu ? 0.52f : 0.95f),
-                new ColorRGBA(0.06f, 0.06f, 0.065f, pauseMenu ? 0.54f : 0.97f),
-                new ColorRGBA(0.025f, 0.025f, 0.03f, pauseMenu ? 0.5f : 0.94f));
+                VaadinPalette.withAlpha(VaadinPalette.DARK_SURFACE, pauseMenu ? 0.48f : 0.96f),
+                VaadinPalette.withAlpha(VaadinPalette.DARK_SURFACE_VARIANT, pauseMenu ? 0.5f : 0.98f),
+                VaadinPalette.withAlpha(VaadinPalette.MID_SURFACE, pauseMenu ? 0.52f : 0.99f),
+                VaadinPalette.withAlpha(VaadinPalette.DARK_SURFACE_VARIANT, pauseMenu ? 0.48f : 0.96f));
         backdrop.setLocalTranslation(0, 0, -1f);
         gui.attachChild(backdrop);
 
@@ -130,10 +131,10 @@ public class MainMenuState extends BaseAppState implements ActionListener {
         float buttonAreaX = panelX + panelWidth * 0.5f;
         float buttonAreaY = panelY + 72f;
         Geometry buttonBackdrop = createGradientQuad(buttonAreaWidth, buttonAreaHeight,
-                new ColorRGBA(0.12f, 0.13f, 0.16f, 0.74f),
-                new ColorRGBA(0.1f, 0.11f, 0.14f, 0.7f),
-                new ColorRGBA(0.17f, 0.18f, 0.22f, 0.78f),
-                new ColorRGBA(0.14f, 0.15f, 0.18f, 0.74f));
+                VaadinPalette.withAlpha(VaadinPalette.DARK_SURFACE_VARIANT, 0.82f),
+                VaadinPalette.withAlpha(VaadinPalette.DARK_SURFACE, 0.78f),
+                VaadinPalette.withAlpha(VaadinPalette.MID_SURFACE, 0.86f),
+                VaadinPalette.withAlpha(VaadinPalette.DARK_SURFACE_VARIANT, 0.82f));
         buttonBackdrop.setLocalTranslation(buttonAreaX - panelX, buttonAreaY - panelY, 0.12f);
         panel.attachChild(buttonBackdrop);
 
@@ -154,14 +155,14 @@ public class MainMenuState extends BaseAppState implements ActionListener {
         subtitleText = new BitmapText(smallFont, false);
         subtitleText.setSize(32f);
         subtitleText.setText(pauseMenu ? "Mach eine kurze Verschnaufpause" : "Bereit für die nächste Dimension?");
-        subtitleText.setColor(new ColorRGBA(0.72f, 0.9f, 1f, 0.94f));
+        subtitleText.setColor(VaadinPalette.withAlpha(VaadinPalette.TEXT_MEDIUM, 0.94f));
         subtitleText.setLocalTranslation(contentX, headingTop - 56f, 0.2f);
         gui.attachChild(subtitleText);
 
         taglineText = new BitmapText(smallFont, false);
         taglineText.setSize(24f);
         taglineText.setText(pauseMenu ? "Bereit, wenn du es bist" : "Synthwave Championship Edition");
-        taglineText.setColor(new ColorRGBA(0.6f, 0.78f, 1f, 0.86f));
+        taglineText.setColor(VaadinPalette.withAlpha(VaadinPalette.TEXT_SUBTLE, 0.9f));
         taglineText.setLocalTranslation(contentX, headingTop - 92f, 0.2f);
         gui.attachChild(taglineText);
 
@@ -171,7 +172,7 @@ public class MainMenuState extends BaseAppState implements ActionListener {
         hintText = new BitmapText(smallFont, false);
         hintText.setSize(20f);
         hintText.setText(pauseMenu ? "ENTER fortsetzen  •  ESC zurück" : "ENTER starten  •  Klicke oder nutze A/D");
-        hintText.setColor(new ColorRGBA(0.82f, 0.88f, 0.98f, 0.9f));
+        hintText.setColor(VaadinPalette.withAlpha(VaadinPalette.TEXT_SUBTLE, 0.92f));
         float hintBaseline = panelY + 36f;
         hintText.setLocalTranslation(buttonColumnX - (hintText.getLineWidth() / 2f), hintBaseline, 0.2f);
         gui.attachChild(hintText);
@@ -417,15 +418,15 @@ public class MainMenuState extends BaseAppState implements ActionListener {
         container.attachChild(ball);
 
         heroRing = createRing(ballRadius * 1.2f, ballRadius * 1.42f,
-                new ColorRGBA(0.5f, 0.85f, 1f, 0.08f),
-                new ColorRGBA(0.42f, 0.85f, 1f, 0.42f));
+                VaadinPalette.withAlpha(VaadinPalette.ACCENT_PRIMARY_SOFT, 0.12f),
+                VaadinPalette.withAlpha(VaadinPalette.ACCENT_PRIMARY, 0.46f));
         heroRing.setLocalTranslation(centerX, centerY, 0.25f);
         container.attachChild(heroRing);
 
         Node trailNode = new Node("hero-trail-node");
         float trailWidth = width * 0.78f;
         float trailHeight = height * 0.18f;
-        heroTrailColor.set(0.32f, 0.75f, 1f, 0.3f);
+        heroTrailColor.set(VaadinPalette.withAlpha(VaadinPalette.ACCENT_PRIMARY_SOFT, 0.34f));
         heroTrail = new Geometry("hero-trail", new Quad(trailWidth, trailHeight));
         Material trailMat = new Material(app.getAssetManager(), "Common/MatDefs/Misc/Unshaded.j3md");
         trailMat.setColor("Color", heroTrailColor.clone());
@@ -440,22 +441,22 @@ public class MainMenuState extends BaseAppState implements ActionListener {
 
         heroOrbs.add(createOrb(container, centerX - ballRadius * 1.65f, centerY + ballRadius * 0.3f,
                 ballRadius * 0.42f, 1.35f, ballRadius * 0.35f, 0f, 0.08f,
-                new ColorRGBA(0.55f, 0.86f, 1f, 0.85f),
-                new ColorRGBA(0.2f, 0.55f, 1f, 0.15f)));
+                VaadinPalette.withAlpha(VaadinPalette.ACCENT_PRIMARY_SOFT, 0.92f),
+                VaadinPalette.withAlpha(VaadinPalette.ACCENT_PRIMARY, 0.18f)));
         heroOrbs.add(createOrb(container, centerX + ballRadius * 1.4f, centerY - ballRadius * 0.6f,
                 ballRadius * 0.35f, 1.6f, ballRadius * 0.42f, FastMath.PI * 0.5f, 0.1f,
-                new ColorRGBA(0.9f, 0.6f, 1f, 0.85f),
-                new ColorRGBA(0.5f, 0.2f, 1f, 0.18f)));
+                VaadinPalette.withAlpha(VaadinPalette.ACCENT_SECONDARY, 0.88f),
+                VaadinPalette.withAlpha(VaadinPalette.ACCENT_PRIMARY_SOFT, 0.2f)));
         heroOrbs.add(createOrb(container, centerX - ballRadius * 0.4f, centerY - ballRadius * 1.4f,
                 ballRadius * 0.28f, 1.85f, ballRadius * 0.3f, FastMath.PI, 0.12f,
-                new ColorRGBA(0.95f, 0.95f, 1f, 0.75f),
-                new ColorRGBA(0.3f, 0.85f, 1f, 0.12f)));
+                VaadinPalette.withAlpha(VaadinPalette.TEXT_HIGH, 0.78f),
+                VaadinPalette.withAlpha(VaadinPalette.ACCENT_SECONDARY, 0.16f)));
 
         Geometry scanline = createGradientQuad(width * 0.85f, 4f,
-                new ColorRGBA(0.36f, 0.8f, 1f, 0f),
-                new ColorRGBA(0.36f, 0.8f, 1f, 0.45f),
-                new ColorRGBA(0.36f, 0.8f, 1f, 0f),
-                new ColorRGBA(0.36f, 0.8f, 1f, 0.45f));
+                VaadinPalette.withAlpha(VaadinPalette.ACCENT_PRIMARY, 0f),
+                VaadinPalette.withAlpha(VaadinPalette.ACCENT_PRIMARY_SOFT, 0.55f),
+                VaadinPalette.withAlpha(VaadinPalette.ACCENT_PRIMARY, 0f),
+                VaadinPalette.withAlpha(VaadinPalette.ACCENT_PRIMARY_SOFT, 0.55f));
         scanline.setLocalTranslation(width * 0.08f, height * 0.32f, 0.18f);
         container.attachChild(scanline);
 
@@ -603,31 +604,31 @@ public class MainMenuState extends BaseAppState implements ActionListener {
 
         panelOutline = new Geometry("panel-outline", new Quad(panelWidth + outlinePadding, panelHeight + outlinePadding));
         Material outlineMat = new Material(app.getAssetManager(), "Common/MatDefs/Misc/Unshaded.j3md");
-        outlineMat.setColor("Color", new ColorRGBA(accentColor.r, accentColor.g * 0.6f, accentColor.b, 0.24f));
+        outlineMat.setColor("Color", VaadinPalette.withAlpha(accentColor, 0.28f));
         panelOutline.setMaterial(outlineMat);
         panelOutline.setQueueBucket(RenderQueue.Bucket.Gui);
         panelOutline.setLocalTranslation(-outlinePadding / 2f, -outlinePadding / 2f, -0.05f);
         container.attachChild(panelOutline);
 
         panelFill = createGradientQuad(panelWidth, panelHeight,
-                new ColorRGBA(0.06f, 0.09f, 0.16f, 0.92f),
-                new ColorRGBA(0.08f, 0.12f, 0.2f, 0.92f),
-                new ColorRGBA(0.16f, 0.2f, 0.32f, 0.94f),
-                new ColorRGBA(0.12f, 0.18f, 0.28f, 0.94f));
+                VaadinPalette.withAlpha(VaadinPalette.DARK_SURFACE, 0.9f),
+                VaadinPalette.withAlpha(VaadinPalette.DARK_SURFACE_VARIANT, 0.92f),
+                VaadinPalette.withAlpha(VaadinPalette.MID_SURFACE, 0.94f),
+                VaadinPalette.withAlpha(VaadinPalette.DARK_SURFACE_VARIANT, 0.92f));
         panelFill.setLocalTranslation(0, 0, 0);
         container.attachChild(panelFill);
 
         panelSheen = createGradientQuad(panelWidth, panelHeight,
-                new ColorRGBA(0.18f, 0.36f, 0.75f, 0.08f),
-                new ColorRGBA(0.12f, 0.2f, 0.5f, 0.08f),
-                new ColorRGBA(0.4f, 0.7f, 1f, 0.18f),
-                new ColorRGBA(0.2f, 0.5f, 0.9f, 0.1f));
+                VaadinPalette.withAlpha(VaadinPalette.ACCENT_PRIMARY_SOFT, 0.06f),
+                VaadinPalette.withAlpha(VaadinPalette.ACCENT_PRIMARY, 0.08f),
+                VaadinPalette.withAlpha(VaadinPalette.ACCENT_SECONDARY, 0.16f),
+                VaadinPalette.withAlpha(VaadinPalette.ACCENT_PRIMARY_SOFT, 0.1f));
         panelSheen.setLocalTranslation(0, 0, 0.02f);
         container.attachChild(panelSheen);
 
         Geometry topEdge = new Geometry("panel-top-edge", new Quad(panelWidth, 6f));
         Material edgeMat = new Material(app.getAssetManager(), "Common/MatDefs/Misc/Unshaded.j3md");
-        edgeMat.setColor("Color", new ColorRGBA(accentColor.r, accentColor.g, accentColor.b, 0.55f));
+        edgeMat.setColor("Color", VaadinPalette.withAlpha(accentColor, 0.48f));
         topEdge.setMaterial(edgeMat);
         topEdge.setQueueBucket(RenderQueue.Bucket.Gui);
         topEdge.setLocalTranslation(0, panelHeight - 6f, 0.04f);
@@ -647,16 +648,16 @@ public class MainMenuState extends BaseAppState implements ActionListener {
         private final Geometry accentBar;
         private final BitmapText icon;
         private final Geometry selectionHalo;
-        private final ColorRGBA baseTop = new ColorRGBA(0.18f, 0.25f, 0.36f, 0.95f);
-        private final ColorRGBA baseBottom = new ColorRGBA(0.11f, 0.15f, 0.24f, 0.95f);
-        private final ColorRGBA hoverTop = mix(baseTop, accentColor, 0.5f);
-        private final ColorRGBA hoverBottom = mix(baseBottom, accentColor, 0.5f);
-        private final ColorRGBA pressTop = mix(baseTop, accentColor, 0.74f);
-        private final ColorRGBA pressBottom = mix(baseBottom, accentColor, 0.74f);
-        private final ColorRGBA glowColor = accentColor.clone();
-        private final ColorRGBA labelBase = new ColorRGBA(0.88f, 0.94f, 1f, 1f);
-        private final ColorRGBA labelHighlight = ColorRGBA.White.clone();
-        private final ColorRGBA accentBarColor = accentColor.clone();
+        private final ColorRGBA baseTop = VaadinPalette.withAlpha(VaadinPalette.MID_SURFACE, 0.96f);
+        private final ColorRGBA baseBottom = VaadinPalette.withAlpha(VaadinPalette.DARK_SURFACE_VARIANT, 0.98f);
+        private final ColorRGBA hoverTop = mix(baseTop, accentColor, 0.45f);
+        private final ColorRGBA hoverBottom = mix(baseBottom, accentColor, 0.45f);
+        private final ColorRGBA pressTop = mix(baseTop, accentColor, 0.7f);
+        private final ColorRGBA pressBottom = mix(baseBottom, accentColor, 0.7f);
+        private final ColorRGBA glowColor = VaadinPalette.withAlpha(accentColor.clone(), 0.7f);
+        private final ColorRGBA labelBase = VaadinPalette.TEXT_HIGH.clone();
+        private final ColorRGBA labelHighlight = VaadinPalette.TEXT_HIGH.clone();
+        private final ColorRGBA accentBarColor = VaadinPalette.withAlpha(accentColor.clone(), 0.24f);
         private final VertexBuffer colorBuffer;
         private final Material glowMat;
         private final Material accentMat;
@@ -671,7 +672,7 @@ public class MainMenuState extends BaseAppState implements ActionListener {
 
             shadow = new Geometry("shadow", new Quad(width + 18f, height + 18f));
             Material shadowMat = new Material(app.getAssetManager(), "Common/MatDefs/Misc/Unshaded.j3md");
-            shadowMat.setColor("Color", new ColorRGBA(0, 0, 0, 0.28f));
+            shadowMat.setColor("Color", new ColorRGBA(0, 0, 0, 0.22f));
             shadow.setMaterial(shadowMat);
             shadow.setLocalTranslation(-9f, -9f, -0.25f);
             shadow.setQueueBucket(RenderQueue.Bucket.Gui);
@@ -680,7 +681,7 @@ public class MainMenuState extends BaseAppState implements ActionListener {
             selectionHalo = new Geometry("halo", new Quad(width + 12f, height + 12f));
             selectionMat = new Material(app.getAssetManager(), "Common/MatDefs/Misc/Unshaded.j3md");
             selectionMat.getAdditionalRenderState().setBlendMode(RenderState.BlendMode.Additive);
-            selectionMat.setColor("Color", new ColorRGBA(accentColor.r, accentColor.g, accentColor.b, 0f));
+            selectionMat.setColor("Color", VaadinPalette.withAlpha(accentColor, 0f));
             selectionHalo.setMaterial(selectionMat);
             selectionHalo.setQueueBucket(RenderQueue.Bucket.Gui);
             selectionHalo.setLocalTranslation(-6f, -6f, -0.1f);
@@ -702,7 +703,7 @@ public class MainMenuState extends BaseAppState implements ActionListener {
             icon = new BitmapText(smallFont, false);
             icon.setSize(30f);
             icon.setText("›");
-            icon.setColor(accentColor.clone());
+            icon.setColor(VaadinPalette.withAlpha(accentColor, 0.92f));
             icon.setLocalTranslation(24f, (height + icon.getLineHeight()) / 2f - 2f, 0.1f);
             attachChild(icon);
 
@@ -717,7 +718,6 @@ public class MainMenuState extends BaseAppState implements ActionListener {
 
             accentBar = new Geometry("accent-bar", new Quad(width, 4f));
             accentMat = new Material(app.getAssetManager(), "Common/MatDefs/Misc/Unshaded.j3md");
-            accentBarColor.a = 0.18f;
             accentMat.setColor("Color", accentBarColor);
             accentBar.setMaterial(accentMat);
             accentBar.setQueueBucket(RenderQueue.Bucket.Gui);
@@ -788,9 +788,11 @@ public class MainMenuState extends BaseAppState implements ActionListener {
             accentBarColor.a = selected ? 0.95f : hovered ? 0.55f : 0.2f;
             accentMat.setColor("Color", accentBarColor);
             label.setColor((selected || hovered) ? labelHighlight : labelBase);
-            icon.setColor((selected || hovered) ? labelHighlight : accentColor);
+            icon.setColor((selected || hovered)
+                    ? labelHighlight
+                    : VaadinPalette.withAlpha(accentColor, 0.92f));
             float haloAlpha = selected ? 0.3f : hovered ? 0.16f : 0f;
-            selectionMat.setColor("Color", new ColorRGBA(accentColor.r, accentColor.g, accentColor.b, haloAlpha));
+            selectionMat.setColor("Color", VaadinPalette.withAlpha(accentColor, haloAlpha));
         }
 
         private void updateGradient(ColorRGBA top, ColorRGBA bottom) {
