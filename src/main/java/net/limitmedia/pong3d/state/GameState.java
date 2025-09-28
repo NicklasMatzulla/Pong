@@ -31,6 +31,7 @@ import com.jme3.scene.Geometry;
 import com.jme3.scene.Node;
 import com.jme3.scene.Spatial;
 import com.jme3.scene.control.AbstractControl;
+import com.jme3.scene.control.BillboardControl;
 import com.jme3.scene.shape.Box;
 import com.jme3.scene.shape.Quad;
 import com.jme3.scene.shape.Sphere;
@@ -82,6 +83,7 @@ public class GameState extends BaseAppState implements ActionListener {
     private final ColorRGBA auroraColor = new ColorRGBA();
     private final ColorRGBA ribbonColor = new ColorRGBA();
     private final Vector3f ballVel = new Vector3f(5f, 0f, -6f);
+    private final Vector3f lastBallPosition = new Vector3f();
     private final float paddleSpeed = 12f;
 
     private boolean movePlayerLeft, movePlayerRight, moveEnemyLeft, moveEnemyRight;
@@ -145,6 +147,32 @@ public class GameState extends BaseAppState implements ActionListener {
     private AudioNode goalSound;
     private Texture2D ballTexture;
     private Material ballMaterial;
+
+    private ParticleEmitter ballTrail;
+    private Node ballGlowNode;
+    private Geometry ballGlowQuad;
+    private Material ballGlowMaterial;
+    private final ColorRGBA ballTrailStartColor = new ColorRGBA(VaadinPalette.ACCENT_PRIMARY_SOFT.r,
+            VaadinPalette.ACCENT_PRIMARY_SOFT.g, VaadinPalette.ACCENT_PRIMARY_SOFT.b, 0.88f);
+    private final ColorRGBA ballTrailEndColor = new ColorRGBA(VaadinPalette.ACCENT_PRIMARY_SOFT.r,
+            VaadinPalette.ACCENT_PRIMARY_SOFT.g, VaadinPalette.ACCENT_PRIMARY_SOFT.b, 0f);
+    private final ColorRGBA ballGlowColor = new ColorRGBA(VaadinPalette.ACCENT_PRIMARY_SOFT.r,
+            VaadinPalette.ACCENT_PRIMARY_SOFT.g, VaadinPalette.ACCENT_PRIMARY_SOFT.b, 0.32f);
+    private float ballGlowPulse = 0f;
+
+    private final Vector3f tempVec = new Vector3f();
+
+    private Node hudGlass;
+    private Geometry hudGlassShadow;
+    private Geometry hudGlassFill;
+    private Geometry hudGlassOutline;
+    private Material hudGlassFillMaterial;
+    private Material hudGlassOutlineMaterial;
+    private final ColorRGBA hudGlassBaseColor = VaadinPalette.elevateSurface(0.5f);
+    private final ColorRGBA hudGlassAccentColor = VaadinPalette.ACCENT_PRIMARY_SOFT.clone();
+    private float hudGlassWidth = 360f;
+    private float hudGlassHeight = 84f;
+    private final ColorRGBA hudGlassDynamicColor = new ColorRGBA();
 
     public GameState(SimpleApplication app, Runnable onPause) {
         this(app, onPause, null);
@@ -304,6 +332,7 @@ public class GameState extends BaseAppState implements ActionListener {
         ball = new Geometry("ball", sph);
         ball.setMaterial(ballMaterial);
         ball.setLocalTranslation(0, ballRadius, 0);
+        lastBallPosition.set(ball.getLocalTranslation());
 
         root.attachChild(playerPaddle);
         root.attachChild(enemyPaddle);
@@ -312,6 +341,11 @@ public class GameState extends BaseAppState implements ActionListener {
         // FX-Wurzel
         effects.setQueueBucket(RenderQueue.Bucket.Transparent);
         root.attachChild(effects);
+
+        ballTrail = createBallTrail();
+        effects.attachChild(ballTrail);
+        ballGlowNode = createBallGlow();
+        effects.attachChild(ballGlowNode);
 
         bounceSound = ProceduralAudioFactory.createBounceSound();
         root.attachChild(bounceSound);
@@ -328,6 +362,8 @@ public class GameState extends BaseAppState implements ActionListener {
         hud = new BitmapText(font, false);
         hud.setSize(32);
         hud.setColor(hudColor);
+        hudGlass = createHudGlass(hudGlassWidth, hudGlassHeight);
+        app.getGuiNode().attachChild(hudGlass);
         app.getGuiNode().attachChild(hud);
         updateHud();
 
@@ -414,11 +450,20 @@ public class GameState extends BaseAppState implements ActionListener {
         if (multiplayer) {
             pollNetworkStatus();
             if (!applyNetworkState()) {
+                updateBallEffects(tpf);
                 updateNetworkStatus(tpf);
                 updateHud();
+                lastBallPosition.set(ball.getLocalTranslation());
                 return;
             }
             smoothNetworkSpatials(tpf);
+            Vector3f current = ball.getLocalTranslation();
+            tempVec.set(current).subtractLocal(lastBallPosition);
+            float invTpf = tpf > 1e-5f ? 1f / tpf : 0f;
+            tempVec.multLocal(invTpf);
+            ballVel.interpolateLocal(tempVec, FastMath.clamp(tpf * 12f, 0f, 1f));
+            lastBallPosition.set(current);
+            updateBallEffects(tpf);
             updateNetworkStatus(tpf);
             updateHud();
             return;
@@ -524,6 +569,8 @@ public class GameState extends BaseAppState implements ActionListener {
         }
 
         limitBallSpeed();
+        lastBallPosition.set(ball.getLocalTranslation());
+        updateBallEffects(tpf);
         updateHud();
     }
 
@@ -544,6 +591,45 @@ public class GameState extends BaseAppState implements ActionListener {
         limitBallSpeed();
     }
 
+    private void updateBallEffects(float tpf) {
+        if (ballTrail == null || ballGlowNode == null) {
+            return;
+        }
+        Vector3f position = ball.getLocalTranslation();
+        ballTrail.setLocalTranslation(position);
+        float speed = ballVel.length();
+        float rate = speed < 0.35f ? 0f : FastMath.clamp(speed * 5.5f, 18f, 95f);
+        ballTrail.setParticlesPerSec(rate);
+        tempVec.set(ballVel).multLocal(0.08f);
+        tempVec.y *= 0.35f;
+        ballTrail.getParticleInfluencer().setInitialVelocity(tempVec);
+
+        float intensity = FastMath.clamp(speed / 24f, 0.2f, 1.2f);
+        ballTrailStartColor.r = VaadinPalette.ACCENT_PRIMARY_SOFT.r;
+        ballTrailStartColor.g = VaadinPalette.ACCENT_PRIMARY_SOFT.g;
+        ballTrailStartColor.b = VaadinPalette.ACCENT_PRIMARY_SOFT.b;
+        ballTrailStartColor.a = 0.25f + intensity * 0.42f + ballGlowPulse * 0.18f;
+        ballTrailEndColor.r = VaadinPalette.ACCENT_PRIMARY_SOFT.r;
+        ballTrailEndColor.g = VaadinPalette.ACCENT_PRIMARY_SOFT.g;
+        ballTrailEndColor.b = VaadinPalette.ACCENT_PRIMARY_SOFT.b;
+        ballTrailEndColor.a = 0f;
+        ballTrail.setStartColor(ballTrailStartColor);
+        ballTrail.setEndColor(ballTrailEndColor);
+
+        ballGlowNode.setLocalTranslation(position);
+        float glowScale = 0.8f + intensity * 0.45f + ballGlowPulse * 0.35f;
+        ballGlowNode.setLocalScale(glowScale);
+        if (ballGlowMaterial != null) {
+            float alpha = 0.22f + intensity * 0.26f + ballGlowPulse * 0.35f;
+            ballGlowColor.r = VaadinPalette.ACCENT_PRIMARY_SOFT.r;
+            ballGlowColor.g = VaadinPalette.ACCENT_PRIMARY_SOFT.g;
+            ballGlowColor.b = VaadinPalette.ACCENT_PRIMARY_SOFT.b;
+            ballGlowColor.a = FastMath.clamp(alpha, 0.12f, 0.88f);
+            ballGlowMaterial.setColor("Color", ballGlowColor);
+        }
+        ballGlowPulse = Math.max(0f, ballGlowPulse - tpf * 1.6f);
+    }
+
     private void updateCameraFollow(float tpf) {
         if (cameraShakeDuration <= 0f) {
             float blend = FastMath.clamp(tpf * 4.5f, 0f, 1f);
@@ -562,6 +648,20 @@ public class GameState extends BaseAppState implements ActionListener {
         float y = app.getCamera().getHeight() - 20f;
         hud.setLocalTranslation(x, y, 0);
         hud.setColor(hudColor);
+        float targetWidth = Math.max(320f, hud.getLineWidth() + 160f);
+        if (Math.abs(targetWidth - hudGlassWidth) > 2f) {
+            hudGlassWidth = targetWidth;
+            if (hudGlass != null) {
+                hudGlass.removeFromParent();
+            }
+            hudGlass = createHudGlass(hudGlassWidth, hudGlassHeight);
+            app.getGuiNode().attachChild(hudGlass);
+        }
+        if (hudGlass != null) {
+            float plateX = (app.getCamera().getWidth() - hudGlassWidth) / 2f;
+            float plateY = y - hud.getLineHeight() - 26f;
+            hudGlass.setLocalTranslation(plateX, plateY, -0.1f);
+        }
     }
 
     private void updateBackground(float tpf) {
@@ -617,6 +717,19 @@ public class GameState extends BaseAppState implements ActionListener {
 
         hudColor.set(VaadinPalette.TEXT_HIGH);
         hudColor.interpolateLocal(VaadinPalette.TEXT_MEDIUM, accent * 0.25f);
+
+        if (hudGlassFillMaterial != null) {
+            hudGlassDynamicColor.set(hudGlassBaseColor);
+            hudGlassDynamicColor.interpolateLocal(VaadinPalette.ACCENT_SECONDARY, accent * 0.2f);
+            hudGlassDynamicColor.a = FastMath.clamp(0.7f + accent * 0.2f, 0.65f, 0.92f);
+            hudGlassFillMaterial.setColor("Color", hudGlassDynamicColor);
+        }
+        if (hudGlassOutlineMaterial != null) {
+            ColorRGBA outline = hudGlassAccentColor.clone();
+            outline.interpolateLocal(VaadinPalette.ACCENT_PRIMARY, accent * 0.6f);
+            outline.a = FastMath.clamp(0.18f + accent * 0.3f, 0.12f, 0.6f);
+            hudGlassOutlineMaterial.setColor("Color", outline);
+        }
 
         networkStatusBaseColor.set(VaadinPalette.TEXT_MEDIUM);
         networkStatusBaseColor.interpolateLocal(VaadinPalette.ACCENT_SECONDARY, accent * 0.2f);
@@ -690,6 +803,11 @@ public class GameState extends BaseAppState implements ActionListener {
         bounceStartVel.set(ballVel);
         bounceTargetVel.set(ballVel);
         networkBallPrimed = false;
+        lastBallPosition.set(ball.getLocalTranslation());
+        if (ballTrail != null) {
+            ballTrail.setParticlesPerSec(0f);
+        }
+        ballGlowPulse = 0.4f;
     }
 
     @Override
@@ -699,6 +817,16 @@ public class GameState extends BaseAppState implements ActionListener {
                 app.getViewPort().addProcessor(postProcessor);
             }
             app.getRootNode().attachChild(root);
+            if (hudGlass != null && hudGlass.getParent() == null) {
+                app.getGuiNode().attachChild(hudGlass);
+            }
+            if (hud != null && hud.getParent() == null) {
+                app.getGuiNode().attachChild(hud);
+            }
+            if (networkStatusText != null && networkStatusText.getParent() == null) {
+                app.getGuiNode().attachChild(networkStatusText);
+            }
+            updateHud();
             return null;
         });
     }
@@ -726,6 +854,7 @@ public class GameState extends BaseAppState implements ActionListener {
         }
         im.deleteMapping("PAUSE");
         if (hud != null) hud.removeFromParent();
+        if (hudGlass != null) hudGlass.removeFromParent();
         if (networkStatusText != null) networkStatusText.removeFromParent();
         app.getInputManager().setCursorVisible(true);
         app.getFlyByCamera().setEnabled(false);
@@ -808,6 +937,7 @@ public class GameState extends BaseAppState implements ActionListener {
             lastNetworkDeltaZ = 0f;
             lastNetworkDeltaX = 0f;
             networkBallPrimed = false;
+            lastBallPosition.set(networkBallTarget);
         }
 
         float deltaZ = localBallZ - lastNetworkBallZ;
@@ -929,9 +1059,10 @@ public class GameState extends BaseAppState implements ActionListener {
         float diff = ball.getLocalTranslation().x - paddle.getLocalTranslation().x;
         float offset = FastMath.clamp(diff / 1.4f, -1f, 1f);
         float incomingSpeed = FastMath.abs(ballVel.z);
-        float targetSpeed = FastMath.clamp(incomingSpeed * 1.02f + 0.3f, 6f, 18f);
-        float horizontalAim = FastMath.interpolateLinear(0.35f, ballVel.x, offset * targetSpeed * 0.65f);
-        float verticalBoost = (playerSide ? 4.6f : 4.2f) + FastMath.abs(offset) * 1.8f;
+        float targetSpeed = FastMath.clamp(incomingSpeed * 1.04f + 0.6f, 7f, 20f);
+        float aimBlend = FastMath.clamp(Math.abs(offset), 0f, 1f);
+        float horizontalAim = FastMath.interpolateLinear(0.55f, ballVel.x, offset * targetSpeed * 0.72f);
+        float verticalBoost = 3.9f + aimBlend * 2.6f + FastMath.abs(ballVel.y) * 0.25f;
         float targetZ = playerSide ? -targetSpeed : targetSpeed;
         scheduleBallResponse(horizontalAim, verticalBoost, targetZ, 0.24f);
 
@@ -947,7 +1078,8 @@ public class GameState extends BaseAppState implements ActionListener {
         bounceStartVel.set(ballVel);
         bounceTargetVel.set(targetX, targetY, targetZ);
         bounceBlendTime = 0f;
-        bounceBlendDuration = FastMath.clamp(duration, 0.12f, 0.42f);
+        bounceBlendDuration = FastMath.clamp(duration, 0.08f, 0.28f);
+        ballGlowPulse = FastMath.clamp(ballGlowPulse + 0.25f, 0f, 1.4f);
     }
 
     private static float smootherStep(float t) {
@@ -1006,6 +1138,78 @@ public class GameState extends BaseAppState implements ActionListener {
         return material;
     }
 
+    private ParticleEmitter createBallTrail() {
+        ParticleEmitter trail = new ParticleEmitter("ball-trail", ParticleMesh.Type.Triangle, 96);
+        trail.setGravity(0, 0, 0);
+        trail.setLowLife(0.35f);
+        trail.setHighLife(0.6f);
+        trail.setStartSize(0.26f);
+        trail.setEndSize(0.06f);
+        trail.setStartColor(ballTrailStartColor);
+        trail.setEndColor(ballTrailEndColor);
+        trail.setParticlesPerSec(0);
+        trail.getParticleInfluencer().setInitialVelocity(Vector3f.ZERO.clone());
+        trail.getParticleInfluencer().setVelocityVariation(0.85f);
+        Material mat = new Material(app.getAssetManager(), "Common/MatDefs/Misc/Particle.j3md");
+        mat.setTexture("Texture", ballTexture);
+        trail.setMaterial(mat);
+        return trail;
+    }
+
+    private Node createBallGlow() {
+        Node node = new Node("ball-glow");
+        Quad quad = new Quad(1f, 1f);
+        ballGlowQuad = new Geometry("ball-glow-quad", quad);
+        ballGlowMaterial = new Material(app.getAssetManager(), "Common/MatDefs/Misc/Unshaded.j3md");
+        ballGlowMaterial.setColor("Color", ballGlowColor);
+        ballGlowMaterial.getAdditionalRenderState().setBlendMode(RenderState.BlendMode.Additive);
+        ballGlowQuad.setMaterial(ballGlowMaterial);
+        ballGlowQuad.setQueueBucket(RenderQueue.Bucket.Transparent);
+        ballGlowQuad.setLocalTranslation(-0.5f, -0.5f, 0f);
+        BillboardControl billboard = new BillboardControl();
+        billboard.setAlignment(BillboardControl.Alignment.Screen);
+        ballGlowQuad.addControl(billboard);
+        node.attachChild(ballGlowQuad);
+        return node;
+    }
+
+    private void triggerBallFlash() {
+        ballGlowPulse = FastMath.clamp(ballGlowPulse + 0.55f, 0f, 1.4f);
+    }
+
+    private Node createHudGlass(float width, float height) {
+        Node node = new Node("hud-glass");
+
+        hudGlassShadow = new Geometry("hud-shadow", new Quad(width + 120f, height + 120f));
+        Material shadowMat = new Material(app.getAssetManager(), "Common/MatDefs/Misc/Unshaded.j3md");
+        shadowMat.setColor("Color", VaadinPalette.withAlpha(VaadinPalette.TINT_SHADOW, 0.32f));
+        shadowMat.getAdditionalRenderState().setBlendMode(RenderState.BlendMode.Alpha);
+        hudGlassShadow.setMaterial(shadowMat);
+        hudGlassShadow.setQueueBucket(RenderQueue.Bucket.Gui);
+        hudGlassShadow.setLocalTranslation(-60f, -60f, -0.35f);
+        node.attachChild(hudGlassShadow);
+
+        hudGlassFill = new Geometry("hud-fill", new Quad(width, height));
+        hudGlassFillMaterial = new Material(app.getAssetManager(), "Common/MatDefs/Misc/Unshaded.j3md");
+        hudGlassFillMaterial.setColor("Color", VaadinPalette.withAlpha(hudGlassBaseColor, 0.82f));
+        hudGlassFillMaterial.getAdditionalRenderState().setBlendMode(RenderState.BlendMode.Alpha);
+        hudGlassFill.setMaterial(hudGlassFillMaterial);
+        hudGlassFill.setQueueBucket(RenderQueue.Bucket.Gui);
+        hudGlassFill.setLocalTranslation(0f, 0f, -0.2f);
+        node.attachChild(hudGlassFill);
+
+        hudGlassOutline = new Geometry("hud-outline", new Quad(width + 12f, height + 12f));
+        hudGlassOutlineMaterial = new Material(app.getAssetManager(), "Common/MatDefs/Misc/Unshaded.j3md");
+        hudGlassOutlineMaterial.getAdditionalRenderState().setBlendMode(RenderState.BlendMode.Additive);
+        hudGlassOutlineMaterial.setColor("Color", VaadinPalette.withAlpha(hudGlassAccentColor, 0.18f));
+        hudGlassOutline.setMaterial(hudGlassOutlineMaterial);
+        hudGlassOutline.setQueueBucket(RenderQueue.Bucket.Gui);
+        hudGlassOutline.setLocalTranslation(-6f, -6f, -0.28f);
+        node.attachChild(hudGlassOutline);
+
+        return node;
+    }
+
     private Texture2D buildBallTexture() {
         int size = 256;
         ByteBuffer buffer = BufferUtils.createByteBuffer(size * size * 4);
@@ -1042,6 +1246,7 @@ public class GameState extends BaseAppState implements ActionListener {
     }
 
     private void spawnImpactEffect(Vector3f position, ColorRGBA color) {
+        triggerBallFlash();
         ParticleEmitter impact = new ParticleEmitter("impact", ParticleMesh.Type.Triangle, 18);
         impact.setGravity(0, -18f, 0);
         impact.setLowLife(0.25f);
@@ -1080,6 +1285,7 @@ public class GameState extends BaseAppState implements ActionListener {
     }
 
     private void spawnGoalEffect(boolean playerScored) {
+        triggerBallFlash();
         float z = playerScored ? -halfDepth : halfDepth;
         ParticleEmitter ring = new ParticleEmitter("goal-ring", ParticleMesh.Type.Triangle, 42);
         ring.setGravity(0, 0, 0);
